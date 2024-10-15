@@ -4,7 +4,7 @@
 
 `v. 0.0.1`
 
-> **This project is very much in a development phase. If you're just looking for a way to create images, use [Foookus](https://github.com/lllyasviel/Fooocus).**
+> **This project is very much in a development phase. If you're just looking for a way to create images, use [the original Fooocus](https://github.com/lllyasviel/Fooocus).**
 
 Hooocus is a headless variant of [Foookus](https://github.com/lllyasviel/Fooocus), a wonderful creation started by [lllyasviel](https://github.com/lllyasviel)
 
