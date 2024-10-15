@@ -7,7 +7,7 @@ from modules.hash_cache import init_cache, load_cache_from_file
 from utils.build_launcher import build_launcher
 from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
 from modules.model_loader import load_file_from_url
-from utils.consts import REINSTALL_ALL, TRY_INSTALL_XFORMERS
+from utils.consts import REINSTALL_ALL, TRY_INSTALL_XFORMERS, HOOOCUS_VERSION
 
 print('[System ARGV] ' + str(sys.argv))
 
