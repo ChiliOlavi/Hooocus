@@ -12,7 +12,7 @@ from typing import Literal, Optional
 from modules import config, constants, flags
 from modules.sdxl_styles import legal_style_names
 import modules.style_sorter as style_sorter
-import args_manager
+import utils.args_manager as args_manager
 
 style_sorter.try_load_sorted_styles(legal_style_names, config.default_styles)
 config.update_files()

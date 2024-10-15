@@ -10,7 +10,7 @@ import modules.config
 import modules.sdxl_styles
 from modules.flags import MetadataScheme, Performance, Steps
 from modules.flags import SAMPLERS, CIVITAI_NO_KARRAS
-from consts import HOOOCUS_VERSION
+from utils.consts import HOOOCUS_VERSION
 from modules.hash_cache import sha256_from_cache
 from modules.util import quote, unquote, extract_styles_from_prompt, is_json, get_file_from_folder_list
 

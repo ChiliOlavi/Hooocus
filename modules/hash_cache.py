@@ -3,9 +3,9 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 
-import args_manager
+import utils.args_manager as args_manager
 from modules.util import sha256, HASH_SHA256_LENGTH, get_file_from_folder_list
-from consts import HASH_CACHE_PATH
+from utils.consts import HASH_CACHE_PATH
 
 def sha256_from_cache(filepath) -> dict:
 

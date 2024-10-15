@@ -2,7 +2,7 @@
 
 import os
 import gradio as gr
-import args_manager
+import utils.args_manager as args_manager
 
 from modules.localization import localization_js
 

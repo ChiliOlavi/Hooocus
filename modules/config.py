@@ -3,7 +3,7 @@ import json
 import math
 import numbers
 
-import args_manager
+import utils.args_manager as args_manager
 import tempfile
 import modules.flags
 import modules.sdxl_styles

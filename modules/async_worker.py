@@ -4,7 +4,7 @@ from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_settings, patch_all
 import modules.config
 
-from consts import HOOOCUS_VERSION
+from utils.consts import HOOOCUS_VERSION
 
 patch_all()
 
@@ -14,7 +14,7 @@ class AsyncTask:
         from modules.flags import Performance, MetadataScheme, ip_list, disabled
         from modules.util import get_enabled_loras
         from modules.config import default_max_lora_number
-        import args_manager
+        import utils.args_manager as args_manager
 
         self.args = args.copy()
         self.yields = []
@@ -176,7 +176,7 @@ def worker():
     import numpy as np
     import torch
     import time
-    import shared
+    import utils.shared as shared
     import random
     import copy
     import cv2
