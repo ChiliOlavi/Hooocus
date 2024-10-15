@@ -24,7 +24,7 @@ Priorities:
 ``python3 -m venv venv``
 ``source venv/bin/activate``
 ``python3 -m pip install -r requirements_versions.txt``
-
+--> A work in progress....
 
 ## List of "Hidden" Tricks already present in Fooocus
 
