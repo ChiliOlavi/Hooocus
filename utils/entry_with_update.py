@@ -66,4 +66,4 @@ if CHECK_UPDATES:
         print(str(e))
 
 print("Launching the application...")
-from launch import *
+from utils.launch import *
