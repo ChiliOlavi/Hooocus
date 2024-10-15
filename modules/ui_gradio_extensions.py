@@ -1,9 +1,10 @@
 # based on https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/v1.6.0/modules/ui_gradio_extensions.py
 
 import os
+import sys
 import gradio as gr
 import utils.args_manager as args_manager
-
+from utils.consts import PARENT_DIR
 from modules.localization import localization_js
 
 
@@ -12,14 +13,12 @@ GradioTemplateResponseOriginal = gr.routes.templates.TemplateResponse
 modules_path = os.path.dirname(os.path.realpath(__file__))
 script_path = os.path.dirname(modules_path)
 
+parent_folder = os.path.abspath(os.path.join(script_path, os.pardir))
 
 def webpath(fn):
-    if fn.startswith(script_path):
-        web_path = os.path.relpath(fn, script_path).replace('\\', '/')
-    else:
-        web_path = os.path.abspath(fn)
-
-    return f'file={web_path}?{os.path.getmtime(fn)}'
+    web_path = f"{PARENT_DIR}/{fn}"
+    
+    return f'file={web_path}'
 
 
 def javascript_html():
