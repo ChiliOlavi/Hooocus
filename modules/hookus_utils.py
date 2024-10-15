@@ -27,11 +27,6 @@ REFINER_SWAP_METHODS = Literal['joint', 'separate', 'vae']
 
 DEFAULT_PERFORMANCE_SELECTION = flags.Performance.HYPER_SD
 
-lora_ctrls_pre = [LoraTuple(enabled=enbled, model=model, weight=weight) for enbled, model, weight in config.default_loras]
-lora_ctrls = []
-for lora in lora_ctrls_pre:
-    lora_ctrls.append(lora.to_array())
-
 class LoraTuple(BaseModel):
     enabled: bool = False
     model: str = ""
@@ -45,6 +40,13 @@ class LoraTuple(BaseModel):
     
     def to_array(self):
         return [self.enabled, self.model, self.weight]
+
+
+lora_ctrls_pre = [LoraTuple(enabled=enbled, model=model, weight=weight) for enbled, model, weight in config.default_loras]
+lora_ctrls = []
+for lora in lora_ctrls_pre:
+    lora_ctrls.append(lora.to_array())
+
 
 
 class ControlNetImageTask(BaseModel):
@@ -110,7 +112,7 @@ class EnhanceMaskCtrls(BaseModel):
     
 
 
-class PdAcyncTask(BaseModel):
+class ImageGenerationSeed(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
@@ -225,8 +227,7 @@ class PdAcyncTask(BaseModel):
 
     enhance_uov_prompt_type: str = config.default_enhance_uov_prompt_type
     enhance_ctrls: Optional[list[EnhanceMaskCtrls]] = []
-
-    should_enhance: bool = True if enhance_checkbox and (enhance_uov_method != flags.disabled.casefold() or len(enhance_ctrls) > 0)
+    should_enhance: bool = True if enhance_checkbox and (enhance_uov_method != flags.disabled.casefold() or len(enhance_ctrls) > 0) else False
 
     @field_validator("output_format")
     def validate_output_format(cls, v):
@@ -364,7 +365,6 @@ class PdAcyncTask(BaseModel):
 
 
 if __name__ == "__main__":
-    test_obj = PdAcyncTask()
     ...
     
 
