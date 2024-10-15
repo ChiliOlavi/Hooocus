@@ -6,11 +6,11 @@ from pathlib import Path
 import gradio as gr
 from PIL import Image
 
-import fooocus_version
 import modules.config
 import modules.sdxl_styles
 from modules.flags import MetadataScheme, Performance, Steps
 from modules.flags import SAMPLERS, CIVITAI_NO_KARRAS
+from consts import HOOOCUS_VERSION
 from modules.hash_cache import sha256_from_cache
 from modules.util import quote, unquote, extract_styles_from_prompt, is_json, get_file_from_folder_list
 
@@ -644,7 +644,7 @@ def get_exif(metadata: str | None, metadata_scheme: str):
     # 0x9286 = UserComment
     exif[0x9286] = metadata
     # 0x0131 = Software
-    exif[0x0131] = 'Fooocus v' + fooocus_version.version
+    exif[0x0131] = 'Hooocus v' + HOOOCUS_VERSION
     # 0x927C = MakerNote
     exif[0x927C] = metadata_scheme
     return exif

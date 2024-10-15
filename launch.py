@@ -2,7 +2,6 @@ import os
 import ssl
 import sys
 import platform
-import fooocus_version
 from modules import config
 from modules.hash_cache import init_cache, load_cache_from_file
 from build_launcher import build_launcher
@@ -32,7 +31,7 @@ def prepare_environment():
     requirements_file = os.environ.get('REQS_FILE', "requirements_versions.txt")
 
     print(f"Python {sys.version}")
-    print(f"Fooocus version: {fooocus_version.version}")
+    print(f"Fooocus version: {HOOOCUS_VERSION}")
 
     if REINSTALL_ALL or not is_installed("torch") or not is_installed("torchvision"):
         run(f'"{python}" -m {torch_command}', "Installing torch and torchvision", "Couldn't install torch", live=True)

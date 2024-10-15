@@ -23,6 +23,7 @@ from modules.private_logger import get_current_html_path
 from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
+from consts import HOOOCUS_VERSION
 
 def get_task(*args):
     args = list(args)
@@ -145,7 +146,7 @@ def inpaint_mode_change(mode, inpaint_engine_version):
 
 reload_javascript()
 
-title = f'Fooocus {fooocus_version.version}'
+title = f'Hooocus {HOOOCUS_VERSION}'
 
 if isinstance(args_manager.args.preset, str):
     title += ' ' + args_manager.args.preset

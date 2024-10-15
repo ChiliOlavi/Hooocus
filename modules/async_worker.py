@@ -4,6 +4,8 @@ from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_settings, patch_all
 import modules.config
 
+from consts import HOOOCUS_VERSION
+
 patch_all()
 
 
@@ -388,7 +390,7 @@ def worker():
                                          loras, async_task.vae_name)
             d.append(('Metadata Scheme', 'metadata_scheme',
                       async_task.metadata_scheme.value if async_task.save_metadata_to_images else async_task.save_metadata_to_images))
-            d.append(('Version', 'version', 'Fooocus v' + fooocus_version.version))
+            d.append(('Version', 'version', 'Hooocus v' + HOOOCUS_VERSION))
             img_paths.append(log(x, d, metadata_parser, async_task.output_format, task, persist_image))
 
         return img_paths
