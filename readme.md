@@ -20,6 +20,12 @@ Priorities:
 - Concentrate global state managment more neatly (now having flags, argvs, configs,     consts, globals, config-files etc)
 - Build a basic gradio-free workflow example
 
+## Usage (MacOs / Ubuntu)
+``python3 -m venv venv``
+``source venv/bin/activate``
+``python3 -m pip install -r requirements_versions.txt``
+
+
 ## List of "Hidden" Tricks already present in Fooocus
 
 <a name="tech_list"></a>
