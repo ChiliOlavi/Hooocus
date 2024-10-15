@@ -49,53 +49,6 @@ except Exception as e:
     print('4. All key/value formats are correct.')
 
 
-def try_load_deprecated_user_path_config(config_dict: dict):
-
-    if not os.path.exists('user_path_config.txt'):
-        return
-
-    try:
-        deprecated_config_dict = json.load(open('user_path_config.txt', "r", encoding="utf-8"))
-
-        def replace_config(old_key, new_key):
-            if old_key in deprecated_config_dict:
-                config_dict[new_key] = deprecated_config_dict[old_key]
-                del deprecated_config_dict[old_key]
-
-        replace_config('modelfile_path', 'path_checkpoints')
-        replace_config('lorafile_path', 'path_loras')
-        replace_config('embeddings_path', 'path_embeddings')
-        replace_config('vae_approx_path', 'path_vae_approx')
-        replace_config('upscale_models_path', 'path_upscale_models')
-        replace_config('inpaint_models_path', 'path_inpaint')
-        replace_config('controlnet_models_path', 'path_controlnet')
-        replace_config('clip_vision_models_path', 'path_clip_vision')
-        replace_config('fooocus_expansion_path', 'path_fooocus_expansion')
-        replace_config('temp_outputs_path', 'path_outputs')
-
-        if deprecated_config_dict.get("default_model", None) == 'juggernautXL_version6Rundiffusion.safetensors':
-            os.replace('user_path_config.txt', 'user_path_config-deprecated.txt')
-            print('Config updated successfully in silence. '
-                  'A backup of previous config is written to "user_path_config-deprecated.txt".')
-            return
-
-        if input("Newer models and configs are available. "
-                 "Download and update files? [Y/n]:") in ['n', 'N', 'No', 'no', 'NO']:
-            config_dict.update(deprecated_config_dict)
-            print('Loading using deprecated old models and deprecated old configs.')
-            return
-        else:
-            os.replace('user_path_config.txt', 'user_path_config-deprecated.txt')
-            print('Config updated successfully by user. '
-                  'A backup of previous config is written to "user_path_config-deprecated.txt".')
-            return
-    except Exception as e:
-        print('Processing deprecated config failed')
-        print(e)
-    return config_dict
-
-
-config_dict = try_load_deprecated_user_path_config()
 
 def get_presets():
     preset_folder = 'presets'
