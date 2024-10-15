@@ -2,13 +2,10 @@ import os
 import sys
 import dotenv
 
-dotenv.load_dotenv()
+pardir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+sys.path.append(pardir)
 
-CHECK_UPDATES = os.environ.get('CHECK_UPDATES').lower() == 'true'
-root = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(root)
-os.chdir(root)
-
+from utils.consts import CHECK_UPDATES
 
 if CHECK_UPDATES:
     try:
