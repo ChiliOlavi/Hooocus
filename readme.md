@@ -15,6 +15,10 @@ Goals:
 - A lower level API improving on the existing one with e.g. adding pydantic validations
 - Removing gradio as a dependancy at some point
 
+Priorities:
+- Remove all the 146 global vars lingering in the source
+- 
+
 ## List of "Hidden" Tricks already present in Fooocus
 
 <a name="tech_list"></a>
