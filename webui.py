@@ -5,7 +5,6 @@ import json
 import time
 import shared
 import modules.config
-import fooocus_version
 import modules.html
 import modules.async_worker as worker
 import modules.constants as constants
