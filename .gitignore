@@ -55,3 +55,5 @@ user_path_config-deprecated.txt
 .DS_Store
 venvi
 .timetracker
+__cache__/hash_cache.json
+.env
