@@ -3,18 +3,14 @@ import random
 import os
 import json
 import time
-import shared
 import modules.config
 import modules.html
 import modules.async_worker as worker
 import modules.constants as constants
 import modules.flags as flags
-import modules.gradio_hijack as grh
-import modules.style_sorter as style_sorter
 import modules.meta_parser
-import args_manager
-import copy
-import launch
+import utils.args_manager as args_manager
+import utils.launch as launch
 from extras.inpaint_mask import SAMOptions
 
 from modules.sdxl_styles import legal_style_names
@@ -22,7 +18,7 @@ from modules.private_logger import get_current_html_path
 from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
-from consts import HOOOCUS_VERSION
+from utils.consts import HOOOCUS_VERSION
 
 def get_task(*args):
     args = list(args)
