@@ -5,9 +5,7 @@ from multiprocessing import cpu_count
 
 import args_manager
 from modules.util import sha256, HASH_SHA256_LENGTH, get_file_from_folder_list
-
-HASH_CACHE_PATH = os.environ.get('HASH_CACHE_PATH')
-
+from consts import HASH_CACHE_PATH
 
 def sha256_from_cache(filepath) -> dict:
 
