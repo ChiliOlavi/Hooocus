@@ -23,6 +23,7 @@ from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
 from utils.consts import HOOOCUS_VERSION
+from modules.hookus_utils import ImageGenerationSeed
 
 def get_task(*args):
     args = list(args)
@@ -31,6 +32,14 @@ def get_task(*args):
     return worker.AsyncTask(args=args)
 
 def generate_clicked(task: worker.AsyncTask):
+    # TODO This is for debugging
+    try:
+        imageTask = ImageGenerationSeed(task.args)
+    except Exception as e:
+        print(str(e))
+    # TODO End of debugging
+        
+    
     import ldm_patched.modules.model_management as model_management
 
     with model_management.interrupt_processing_mutex:
