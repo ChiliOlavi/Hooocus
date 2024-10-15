@@ -190,7 +190,6 @@ def worker():
     import modules.constants as constants
     import extras.ip_adapter as ip_adapter
     import extras.face_crop
-    import fooocus_version
 
     from extras.censor import default_censor
     from modules.sdxl_styles import apply_style, get_random_style, fooocus_expansion, apply_arrays, random_style_name
