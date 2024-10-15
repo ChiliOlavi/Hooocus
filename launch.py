@@ -1,15 +1,20 @@
 import os
 import ssl
 import sys
-print('[System ARGV] ' + str(sys.argv))
+import platform
+import fooocus_version
 from modules import config
 from modules.hash_cache import init_cache, load_cache_from_file
+from build_launcher import build_launcher
+from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
+from modules.model_loader import load_file_from_url
+from consts import REINSTALL_ALL, TRY_INSTALL_XFORMERS
+
+print('[System ARGV] ' + str(sys.argv))
 
 root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(root)
 os.chdir(root)
-
-hash_cache = load_cache_from_file()
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
@@ -18,16 +23,7 @@ if "GRADIO_SERVER_PORT" not in os.environ:
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-import platform
-import fooocus_version
-
-from build_launcher import build_launcher
-from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
-from modules.model_loader import load_file_from_url
-
-REINSTALL_ALL = False
-TRY_INSTALL_XFORMERS = False
-
+hash_cache = load_cache_from_file()
 
 def prepare_environment():
     torch_index_url = os.environ.get('TORCH_INDEX_URL', "https://download.pytorch.org/whl/cu121")
