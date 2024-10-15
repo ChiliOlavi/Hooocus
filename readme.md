@@ -6,7 +6,7 @@
 
 > **This project is very much in a development phase. If you're just looking for a way to create images, use [the original Fooocus](https://github.com/lllyasviel/Fooocus).**
 
-Hooocus is a headless variant of [Foookus](https://github.com/lllyasviel/Fooocus), a wonderful creation started by [lllyasviel](https://github.com/lllyasviel)
+Hooocus is a headless variant of [Fooocus](https://github.com/lllyasviel/Fooocus), a wonderful creation started by [lllyasviel](https://github.com/lllyasviel)
 
 Fooocus has included and automated [lots of inner optimizations and quality improvements](#tech_list). Where the Gradio UI my provide ease of use, the im of this fork is to provide ease of automation. Ideally, one should be able to use the Fooocus log parameters as starting points for creating images with Hooocus.
 
