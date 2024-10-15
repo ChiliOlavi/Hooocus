@@ -49,8 +49,7 @@ except Exception as e:
     print('4. All key/value formats are correct.')
 
 
-def try_load_deprecated_user_path_config():
-    global config_dict
+def try_load_deprecated_user_path_config(config_dict: dict):
 
     if not os.path.exists('user_path_config.txt'):
         return
@@ -93,10 +92,10 @@ def try_load_deprecated_user_path_config():
     except Exception as e:
         print('Processing deprecated config failed')
         print(e)
-    return
+    return config_dict
 
 
-try_load_deprecated_user_path_config()
+config_dict = try_load_deprecated_user_path_config()
 
 def get_presets():
     preset_folder = 'presets'
