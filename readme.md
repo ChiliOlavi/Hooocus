@@ -8,7 +8,12 @@
 
 Hooocus is a headless variant of [Fooocus](https://github.com/lllyasviel/Fooocus), a wonderful creation started by [lllyasviel](https://github.com/lllyasviel)
 
-Fooocus has included and automated [lots of inner optimizations and quality improvements](#tech_list). Where the Gradio UI my provide ease of use, the im of this fork is to provide ease of automation. Ideally, one should be able to use the Fooocus log parameters as starting points for creating images with Hooocus.
+Fooocus has included and automated [lots of inner optimizations and quality improvements](#tech_list). Where the Gradio UI may provide ease of use, the aim of this fork is to provide ease of automation. Ideally, one should be able to use the Fooocus log parameters as starting points for creating images with Hooocus. It started out of my own needs.
+
+Goals:
+- A simple HTTP-api for generating images
+- A lower level API improving on the existing one with e.g. adding pydantic validations
+- Removing gradio as a dependancy at some point
 
 ## List of "Hidden" Tricks already present in Fooocus
 
