@@ -17,7 +17,8 @@ Goals:
 
 Priorities:
 - Remove all the 146 global vars lingering in the source
-- 
+- Concentrate global state managment more neatly (now having flags, argvs, configs,     consts, globals, config-files etc)
+- Build a basic gradio-free workflow example
 
 ## List of "Hidden" Tricks already present in Fooocus
 
