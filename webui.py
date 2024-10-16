@@ -22,7 +22,7 @@ from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
 from utils.consts import HOOOCUS_VERSION, AUTH_FILENAME, MIN_SEED, MAX_SEED
-from modules.hookus_utils import ImageGenerationSeed
+from utils.hookus_utils import ImageGenerationSeed
 
 def get_task(*args):
     args = list(args)
