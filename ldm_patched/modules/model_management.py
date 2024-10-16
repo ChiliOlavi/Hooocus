@@ -3,6 +3,7 @@ from enum import Enum
 from ldm_patched.modules.args_parser import args
 import ldm_patched.modules.utils
 import torch
+import importlib.util
 import sys
 
 class VRAMState(Enum):
@@ -45,12 +46,10 @@ if args.directml is not None:
     # torch_directml.disable_tiled_resources(True)
     lowvram_available = False #TODO: need to find a way to get free memory in directml before this can be enabled by default.
 
-try:
-    import intel_extension_for_pytorch as ipex
+    if importlib.util.find_spec("intel_extension_for_pytorch") is not None:
+        import intel_extension_for_pytorch as ipex
     if torch.xpu.is_available():
         xpu_available = True
-except:
-    pass
 
 try:
     if torch.backends.mps.is_available():
@@ -136,7 +135,7 @@ XFORMERS_ENABLED_VAE = True
 if args.disable_xformers:
     XFORMERS_IS_AVAILABLE = False
 else:
-    try:
+    if importlib.util.find_spec("xformers") is not None:
         import xformers
         import xformers.ops
         XFORMERS_IS_AVAILABLE = True
@@ -155,7 +154,7 @@ else:
                 XFORMERS_ENABLED_VAE = False
         except:
             pass
-    except:
+    else:
         XFORMERS_IS_AVAILABLE = False
 
 def is_nvidia():

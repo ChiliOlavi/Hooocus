@@ -275,12 +275,12 @@ def attention_split(q, k, v, heads, mask=None):
     return r1
 
 BROKEN_XFORMERS = False
-try:
+x_enabled = model_management.xformers_enabled()
+if x_enabled:
     x_vers = xformers.__version__
     #I think 0.0.23 is also broken (q with bs bigger than 65535 gives CUDA error)
     BROKEN_XFORMERS = x_vers.startswith("0.0.21") or x_vers.startswith("0.0.22") or x_vers.startswith("0.0.23")
-except:
-    pass
+    
 
 def attention_xformers(q, k, v, heads, mask=None):
     b, _, dim_head = q.shape
