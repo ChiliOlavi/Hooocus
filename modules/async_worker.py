@@ -5,6 +5,7 @@ from modules.patch import PatchSettings, patch_settings, patch_all
 import modules.config
 
 from utils.consts import HOOOCUS_VERSION, MIN_SEED, MAX_SEED
+from utils.hookus_utils import ImageGenerationSeed
 
 patch_all()
 
@@ -334,7 +335,7 @@ def worker():
             async_task.adaptive_cfg
         )
 
-    def save_and_log(async_task, height, imgs, task, use_expansion, width, loras, persist_image=True) -> list:
+    def save_and_log(async_task: ImageGenerationSeed, height, imgs, task, use_expansion, width, loras, persist_image=True) -> list:
         img_paths = []
         for x in imgs:
             d = [('Prompt', 'prompt', task['log_positive_prompt']),
@@ -1068,7 +1069,7 @@ def worker():
 
     @torch.no_grad()
     @torch.inference_mode()
-    def handler(async_task: AsyncTask):
+    def handler(async_task: ImageGenerationSeed):
         preparation_start_time = time.perf_counter()
         async_task.processing = True
 
