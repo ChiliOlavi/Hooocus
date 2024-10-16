@@ -26,3 +26,17 @@ AUTH_FILENAME = 'auth.json'
 
 # From old modules/constants.py
 PYTORCH_ENABLE_MPS_FALLBACK = 1
+
+# Set globals for os.environ 
+locals = vars().copy()
+LOCALS = []
+for k, v in locals.items():
+    if k.isupper():
+        LOCALS.append({k: v})
+
+
+for local in LOCALS:
+    for k, v in local.items():
+        os.environ[k] = str(v)
+
+...
