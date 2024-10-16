@@ -364,9 +364,6 @@ class ImageGenerationSeed(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
         perf_name = flags.Performance(self.performance_selection).name
-        perf_lora = flags.PerformanceLoRA[perf_name].value
-        if perf_lora:
-            self.performance_loras.append(perf_lora)
         self.steps = self.steps if self.steps != -1 else flags.Steps[perf_name].value
         self.original_steps = self.original_steps if self.original_steps != -1 else self.steps
 
