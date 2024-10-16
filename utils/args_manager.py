@@ -45,7 +45,8 @@ args_parser.parser.add_argument("--headless", action="store_true", default=True)
 args_parser.parser.set_defaults(
     disable_cuda_malloc=True,
     in_browser=True,
-    port=None
+    port=None,
+    preset="Realistic"
 )
 
 args_parser.args = args_parser.parser.parse_args()

@@ -10,25 +10,21 @@ from modules.model_loader import load_file_from_url
 from utils.consts import REINSTALL_ALL, TRY_INSTALL_XFORMERS, HOOOCUS_VERSION
 
 print('[System ARGV] ' + str(sys.argv))
-
-root = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(root)
-os.chdir(root)
-
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
-if "GRADIO_SERVER_PORT" not in os.environ:
-    os.environ["GRADIO_SERVER_PORT"] = "7865"
-
+vae_approx_filenames = [
+    ('xlvaeapp.pth', 'https://huggingface.co/lllyasviel/misc/resolve/main/xlvaeapp.pth'),
+    ('vaeapp_sd15.pth', 'https://huggingface.co/lllyasviel/misc/resolve/main/vaeapp_sd15.pt'),
+    ('xl-to-v1_interposer-v4.0.safetensors',
+     'https://huggingface.co/mashb1t/misc/resolve/main/xl-to-v1_interposer-v4.0.safetensors')
+]
 ssl._create_default_https_context = ssl._create_unverified_context
 
-hash_cache = load_cache_from_file()
 
 def prepare_environment():
+    hash_cache = load_cache_from_file()
     torch_index_url = os.environ.get('TORCH_INDEX_URL', "https://download.pytorch.org/whl/cu121")
     torch_command = os.environ.get('TORCH_COMMAND',
                                    f"pip install torch==2.1.0 torchvision==0.16.0 --extra-index-url {torch_index_url}")
-    requirements_file = os.environ.get('REQS_FILE', "requirements_versions.txt")
+    requirements_file = os.environ.get('REQS_FILE', "utils/requirements_versions.txt")
 
     print(f"Python {sys.version}")
     print(f"Fooocus version: {HOOOCUS_VERSION}")
@@ -54,15 +50,54 @@ def prepare_environment():
     if REINSTALL_ALL or not requirements_met(requirements_file):
         run_pip(f"install -r \"{requirements_file}\"", "requirements")
 
+    args = ini_args()
+
+
+    config.default_base_model_name, config.checkpoint_downloads = download_models(
+        config.default_base_model_name, config.previous_default_models, config.checkpoint_downloads,
+        config.embeddings_downloads, config.lora_downloads, config.vae_downloads, args)
+
+    config.update_files()
+
+    if args.gpu_device_id is not None:
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu_device_id)
+        print("Set device to:", args.gpu_device_id)
+
+    if args.hf_mirror is not None:
+        os.environ['HF_MIRROR'] = str(args.hf_mirror)
+        print("Set hf_mirror to:", args.hf_mirror)
+
+
+    os.environ["U2NET_HOME"] = config.path_inpaint
+
+    os.environ['GRADIO_TEMP_DIR'] = config.temp_path
+
+    if config.temp_path_cleanup_on_launch:
+        print(f'[Cleanup] Attempting to delete content of temp dir {config.temp_path}')
+        result = delete_folder_content(config.temp_path, '[Cleanup] ')
+        if result:
+            print("[Cleanup] Cleanup successful")
+        else:
+            print(f"[Cleanup] Failed to delete content of temp dir.")
+        
+
+
+    if len(hash_cache) == 0 and (len(config.model_filenames) > 0 or len(config.lora_filenames) > 0):
+        hash_cache = init_cache(config.model_filenames, config.paths_checkpoints, config.lora_filenames, config.paths_loras)
+        if len(hash_cache) > 0:
+            print(f'[Cache] Initialized with {len(hash_cache)} entries.')
+        else:
+            print('[Cache] Initialization failed.')
+        
+        
+
+    if args.rebuild_hash_cache:
+        init_cache(config.model_filenames, config.paths_checkpoints, config.lora_filenames, config.paths_loras)
+        print('[Cache] Rebuilt cache.')
     return
 
 
-vae_approx_filenames = [
-    ('xlvaeapp.pth', 'https://huggingface.co/lllyasviel/misc/resolve/main/xlvaeapp.pth'),
-    ('vaeapp_sd15.pth', 'https://huggingface.co/lllyasviel/misc/resolve/main/vaeapp_sd15.pt'),
-    ('xl-to-v1_interposer-v4.0.safetensors',
-     'https://huggingface.co/mashb1t/misc/resolve/main/xl-to-v1_interposer-v4.0.safetensors')
-]
+
 
 
 def ini_args():
@@ -70,33 +105,12 @@ def ini_args():
     return args
 
 
-prepare_environment()
-build_launcher()
-args = ini_args()
-
-if args.gpu_device_id is not None:
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu_device_id)
-    print("Set device to:", args.gpu_device_id)
-
-if args.hf_mirror is not None:
-    os.environ['HF_MIRROR'] = str(args.hf_mirror)
-    print("Set hf_mirror to:", args.hf_mirror)
+#prepare_environment()
+#build_launcher()
 
 
-os.environ["U2NET_HOME"] = config.path_inpaint
 
-os.environ['GRADIO_TEMP_DIR'] = config.temp_path
-
-if config.temp_path_cleanup_on_launch:
-    print(f'[Cleanup] Attempting to delete content of temp dir {config.temp_path}')
-    result = delete_folder_content(config.temp_path, '[Cleanup] ')
-    if result:
-        print("[Cleanup] Cleanup successful")
-    else:
-        print(f"[Cleanup] Failed to delete content of temp dir.")
-
-
-def download_models(default_model, previous_default_models, checkpoint_downloads, embeddings_downloads, lora_downloads, vae_downloads):
+def download_models(default_model, previous_default_models, checkpoint_downloads, embeddings_downloads, lora_downloads, vae_downloads, args):
     from modules.util import get_file_from_folder_list
 
     for file_name, url in vae_approx_filenames:
@@ -137,24 +151,6 @@ def download_models(default_model, previous_default_models, checkpoint_downloads
 
     return default_model, checkpoint_downloads
 
-
-config.default_base_model_name, config.checkpoint_downloads = download_models(
-    config.default_base_model_name, config.previous_default_models, config.checkpoint_downloads,
-    config.embeddings_downloads, config.lora_downloads, config.vae_downloads)
-
-config.update_files()
-
-if len(hash_cache) == 0 and (len(config.model_filenames) > 0 or len(config.lora_filenames) > 0):
-    hash_cache = init_cache(config.model_filenames, config.paths_checkpoints, config.lora_filenames, config.paths_loras)
-    if len(hash_cache) > 0:
-        print(f'[Cache] Initialized with {len(hash_cache)} entries.')
-    else:
-        print('[Cache] Initialization failed.')
-    
-    
-
-if args.rebuild_hash_cache:
-    init_cache(config.model_filenames, config.paths_checkpoints, config.lora_filenames, config.paths_loras)
-
-
-from webui import *
+USE_GRADIO = os.environ.get('USE_GRADIO', '0') == '1'
+if os.environ.get('USE_GRADIO', False):
+    from webui import *
