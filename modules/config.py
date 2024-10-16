@@ -65,7 +65,7 @@ def update_presets():
 
 def try_get_preset_content(preset):
     if isinstance(preset, str):
-        preset_path = os.path.abspath(f'./presets/{preset}.json')
+        preset_path = os.path.abspath(f'./presets/{preset.lower()}.json')
         try:
             if os.path.exists(preset_path):
                 with open(preset_path, "r", encoding="utf-8") as json_file:
