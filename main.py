@@ -5,6 +5,7 @@ import modules.async_worker as worker
 import ldm_patched.modules.model_management as model_management
 from utils.hookus_utils import ImageGenerationSeed, EnhanceMaskCtrls, ControlNetImageTask, LoraTuple
 
+import time
 
 def generate_image(task: ImageGenerationSeed):
 
