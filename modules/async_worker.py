@@ -390,7 +390,7 @@ def worker():
             d.append(('Metadata Scheme', 'metadata_scheme',
                       async_task.metadata_scheme.value if async_task.save_metadata_to_images else async_task.save_metadata_to_images))
             d.append(('Version', 'version', 'Hooocus v' + HOOOCUS_VERSION))
-            img_paths.append(log(x, d, metadata_parser, async_task.output_format, task, persist_image))
+            img_paths.append(log(x, async_task.path_outputs, d, metadata_parser, async_task.output_format, task, persist_image))
 
         return img_paths
 
@@ -989,7 +989,7 @@ def worker():
                     progressbar(async_task, current_progress, 'Checking for NSFW content ...')
                     img = default_censor(img)
                 progressbar(async_task, current_progress, f'Saving image {current_task_id + 1}/{total_count} to system ...')
-                uov_image_path = log(img, d, output_format=async_task.output_format, persist_image=persist_image)
+                uov_image_path = log(img, async_task.path_outputs, d, output_format=async_task.output_format, persist_image=persist_image)
                 yield_result(async_task, uov_image_path, current_progress, async_task.black_out_nsfw, False,
                              do_not_show_finished_images=not show_intermediate_results or async_task.disable_intermediate_results)
                 return current_progress, img, prompt, negative_prompt
@@ -1184,7 +1184,7 @@ def worker():
                     progressbar(async_task, 100, 'Checking for NSFW content ...')
                     async_task.uov_input_image = default_censor(async_task.uov_input_image)
                 progressbar(async_task, 100, 'Saving image to system ...')
-                uov_input_image_path = log(async_task.uov_input_image, d, output_format=async_task.output_format)
+                uov_input_image_path = log(async_task.uov_input_image, async_task.path_outputs, d, output_format=async_task.output_format)
                 yield_result(async_task, uov_input_image_path, 100, async_task.black_out_nsfw, False,
                              do_not_show_finished_images=True)
                 return
