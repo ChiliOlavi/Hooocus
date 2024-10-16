@@ -367,6 +367,10 @@ class ImageGenerationSeed(BaseModel):
         self.steps = self.steps if self.steps != -1 else flags.Steps[perf_name].value
         self.original_steps = self.original_steps if self.original_steps != -1 else self.steps
 
+    class Config:
+        arbitrary_types_allowed = True
+        orm_mode = True
+
 
 if __name__ == "__main__":
     ...
