@@ -1,8 +1,10 @@
-from math import e
-from utils.launch import *
+from utils.launch import prepare_environment
+prepare_environment()
+
 import modules.async_worker as worker
 import ldm_patched.modules.model_management as model_management
-from modules.hookus_utils import ImageGenerationSeed, EnhanceMaskCtrls, ControlNetImageTask, LoraTuple
+from utils.hookus_utils import ImageGenerationSeed, EnhanceMaskCtrls, ControlNetImageTask, LoraTuple
+
 
 def generate_image(task: ImageGenerationSeed):
 
