@@ -956,7 +956,7 @@ def worker():
         processing_time = time.perf_counter() - processing_start_time
         print(f'Processing time (total): {processing_time:.2f} seconds')
 
-    def process_enhance(all_steps, async_task, callback, controlnet_canny_path, controlnet_cpds_path,
+    def process_enhance(all_steps, async_task: ImageGenerationSeed, callback, controlnet_canny_path, controlnet_cpds_path,
                         current_progress, current_task_id, denoising_strength, inpaint_disable_initial_latent,
                         inpaint_engine, inpaint_respective_field, inpaint_strength,
                         prompt, negative_prompt, final_scheduler_name, goals, height, img, mask,
