@@ -4,7 +4,7 @@ PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 USE_GRADIO = False
 
-HOOOCUS_VERSION = '2.5.5'
+HOOOCUS_VERSION = '0.5.0'
 
 CHECK_UPDATES=False # Check git upstream for updates
 HASH_CACHE_PATH = f'{PARENT_DIR}/__cache__/hash_cache.json'

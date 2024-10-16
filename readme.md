@@ -2,7 +2,7 @@
 
 ### A *H*eadless variant of Fooocus
 
-`v. 0.0.1`
+`v. 0.5.0`
 
 > **This project is very much in a development phase. If you're just looking for a way to create images, use [the original Fooocus](https://github.com/lllyasviel/Fooocus).**
 
