@@ -43,3 +43,11 @@ def generate_image(task: ImageGenerationSeed):
 
     finally:
         print('Done')
+
+if __name__ == '__main__':
+
+    image_params = ImageGenerationSeed(
+        prompt="A car without headlights a banana"
+        )
+    generate_image(ImageGenerationSeed())
+    print('Done fom main.py')
