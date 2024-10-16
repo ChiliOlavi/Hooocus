@@ -31,7 +31,13 @@ def get_task(*args):
     return worker.AsyncTask(args=args)
 
 def generate_clicked(task: worker.AsyncTask):
+    task_as_json = {}
+    for attr in task.__dict__: 
+        if not attr.startswith("__"):
+            task_as_json[attr] = task.__dict__[attr]
     # TODO This is for debugging
+    with open("task_example.txt", "w") as f:
+        f.write(str(task_as_json))
     try:
         imageTask = ImageGenerationSeed(task.args)
     except Exception as e:
