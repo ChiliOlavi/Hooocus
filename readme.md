@@ -66,7 +66,6 @@ For example, an edited `Fooocus\config.txt` (this file will be generated after t
     "path_controlnet": "D:\\Fooocus\\models\\controlnet",
     "path_clip_vision": "D:\\Fooocus\\models\\clip_vision",
     "path_fooocus_expansion": "D:\\Fooocus\\models\\prompt_expansion\\fooocus_expansion",
-    "path_outputs": "D:\\Fooocus\\outputs",
     "default_model": "realisticStockPhoto_v10.safetensors",
     "default_refiner": "",
     "default_loras": [["lora_filename_1.safetensors", 0.5], ["lora_filename_2.safetensors", 0.5]],

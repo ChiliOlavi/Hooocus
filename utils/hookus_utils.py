@@ -118,7 +118,7 @@ class ImageGenerationSeed(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-
+    path_outputs: str = "./outputs"
     yields: list = []
     results: list = []
     last_stop: bool = False
