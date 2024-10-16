@@ -19,7 +19,7 @@ import ldm_patched.modules.samplers
 import ldm_patched.modules.args_parser
 import warnings
 import safetensors.torch
-import modules.constants as constants
+from utils.consts import MAX_SEED
 
 from ldm_patched.modules.samplers import calc_cond_uncond_batch
 from ldm_patched.k_diffusion.sampling import BatchedBrownianTree
@@ -302,7 +302,7 @@ def patched_KSamplerX0Inpaint_forward(self, x, sigma, uncond, cond, cond_scale, 
 
         if getattr(self, 'energy_generator', None) is None:
             # avoid bad results by using different seeds.
-            self.energy_generator = torch.Generator(device='cpu').manual_seed((seed + 1) % constants.MAX_SEED)
+            self.energy_generator = torch.Generator(device='cpu').manual_seed((seed + 1) % MAX_SEED)
 
         energy_sigma = sigma.reshape([sigma.shape[0]] + [1] * (len(x.shape) - 1))
         current_energy = torch.randn(

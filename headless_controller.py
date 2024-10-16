@@ -6,7 +6,6 @@ import time
 import modules.config
 import modules.html
 import modules.async_worker as worker
-import modules.constants as constants
 import modules.flags as flags
 import modules.meta_parser
 import utils.args_manager as args_manager
@@ -18,7 +17,7 @@ from modules.private_logger import get_current_html_path
 from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
-from utils.consts import HOOOCUS_VERSION
+from utils.consts import HOOOCUS_VERSION, AUTH_FILENAME, MIN_SEED, MAX_SEED
 
 def get_task(*args):
     args = list(args)
@@ -58,8 +57,8 @@ def generate_clicked(task: worker.AsyncTask):
                 ...
             if flag == 'finish':
                 if not args_manager.args.disable_enhance_output_sorting:
-                    product = sort_enhance_images(product, task)
-
+                    #product = sort_enhance_images(product, task)
+                    ...
                 finished = True
 
                 # delete Fooocus temp images, only keep gradio temp images
@@ -144,15 +143,15 @@ def trigger_metadata_preview(file):
 
 def refresh_seed(r, seed_string):
     if r:
-        return random.randint(constants.MIN_SEED, constants.MAX_SEED)
+        return random.randint(MIN_SEED, MAX_SEED)
     else:
         try:
             seed_value = int(seed_string)
-            if constants.MIN_SEED <= seed_value <= constants.MAX_SEED:
+            if MIN_SEED <= seed_value <= MAX_SEED:
                 return seed_value
         except ValueError:
             pass
-        return random.randint(constants.MIN_SEED, constants.MAX_SEED)
+        return random.randint(MIN_SEED, MAX_SEED)
 
 
 

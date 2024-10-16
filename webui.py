@@ -7,7 +7,6 @@ import utils.shared as shared
 import modules.config
 import modules.html
 import modules.async_worker as worker
-import modules.constants as constants
 import modules.flags as flags
 import modules.gradio_hijack as grh
 import modules.style_sorter as style_sorter
@@ -22,7 +21,7 @@ from modules.private_logger import get_current_html_path
 from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
-from utils.consts import HOOOCUS_VERSION
+from utils.consts import HOOOCUS_VERSION, AUTH_FILENAME, MIN_SEED, MAX_SEED
 from modules.hookus_utils import ImageGenerationSeed
 
 def get_task(*args):
@@ -605,15 +604,15 @@ with shared.gradio_root:
 
                 def refresh_seed(r, seed_string):
                     if r:
-                        return random.randint(constants.MIN_SEED, constants.MAX_SEED)
+                        return random.randint(MIN_SEED, MAX_SEED)
                     else:
                         try:
                             seed_value = int(seed_string)
-                            if constants.MIN_SEED <= seed_value <= constants.MAX_SEED:
+                            if MIN_SEED <= seed_value <= MAX_SEED:
                                 return seed_value
                         except ValueError:
                             pass
-                        return random.randint(constants.MIN_SEED, constants.MAX_SEED)
+                        return random.randint(MIN_SEED, MAX_SEED)
 
                 seed_random.change(random_checked, inputs=[seed_random], outputs=[image_seed],
                                    queue=False, show_progress=False)
@@ -1133,5 +1132,5 @@ shared.gradio_root.launch(
     share=args_manager.args.share,
     auth=check_auth if (args_manager.args.share or args_manager.args.listen) and auth_enabled else None,
     allowed_paths=[modules.config.path_outputs],
-    blocked_paths=[constants.AUTH_FILENAME]
+    blocked_paths=[AUTH_FILENAME]
 )

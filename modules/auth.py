@@ -1,6 +1,6 @@
 import json
 import hashlib
-import modules.constants as constants
+from utils.consts import AUTH_FILENAME
 
 from os.path import exists
 
@@ -29,7 +29,7 @@ def load_auth_data(filename=None):
     return auth_dict
 
 
-auth_dict = load_auth_data(constants.AUTH_FILENAME)
+auth_dict = load_auth_data(AUTH_FILENAME)
 
 auth_enabled = auth_dict != None
 

@@ -4,7 +4,7 @@ from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_settings, patch_all
 import modules.config
 
-from utils.consts import HOOOCUS_VERSION
+from utils.consts import HOOOCUS_VERSION, MIN_SEED, MAX_SEED
 
 patch_all()
 
@@ -187,7 +187,6 @@ def worker():
     import ldm_patched.modules.model_management
     import extras.preprocessors as preprocessors
     import modules.inpaint_worker as inpaint_worker
-    import modules.constants as constants
     import extras.ip_adapter as ip_adapter
     import extras.face_crop
 
@@ -670,9 +669,9 @@ def worker():
         tasks = []
         for i in range(image_number):
             if disable_seed_increment:
-                task_seed = async_task.seed % (constants.MAX_SEED + 1)
+                task_seed = async_task.seed % (MAX_SEED + 1)
             else:
-                task_seed = (async_task.seed + i) % (constants.MAX_SEED + 1)  # randint is inclusive, % is not
+                task_seed = (async_task.seed + i) % (MAX_SEED + 1)  # randint is inclusive, % is not
 
             task_rng = random.Random(task_seed)  # may bind to inpaint noise in the future
             task_prompt = apply_wildcards(prompt, task_rng, i, async_task.read_wildcards_in_order)

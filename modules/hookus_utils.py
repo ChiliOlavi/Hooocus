@@ -9,10 +9,11 @@ import random
 from pydantic import BaseModel, field_validator
 from typing import Literal, Optional
 
-from modules import config, constants, flags
+from modules import config, flags
 from modules.sdxl_styles import legal_style_names
 import modules.style_sorter as style_sorter
 import utils.args_manager as args_manager
+from utils.consts import MIN_SEED, MAX_SEED
 
 style_sorter.try_load_sorted_styles(legal_style_names, config.default_styles)
 config.update_files()
@@ -134,7 +135,7 @@ class ImageGenerationSeed(BaseModel):
     image_number: int = 1
     output_format: str = config.default_output_format
     
-    seed: int = random.randint(constants.MIN_SEED, constants.MAX_SEED)
+    seed: int = random.randint(MIN_SEED, MAX_SEED)
     read_wildcards_in_order: bool = False # Read wildcards in order
     sharpness: float = config.default_sample_sharpness
     cfg_scale: float = config.default_cfg_scale # Aka guidance scale
@@ -249,7 +250,7 @@ class ImageGenerationSeed(BaseModel):
     
     @field_validator("seed", mode="after")
     def validate_seed(cls, v):
-        if v < constants.MIN_SEED or v > constants.MAX_SEED:
+        if v < MIN_SEED or v > MAX_SEED:
             raise ValueError(f"Invalid seed value: {v}")
         return v
     

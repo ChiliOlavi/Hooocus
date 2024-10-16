@@ -15,3 +15,10 @@ TRY_INSTALL_XFORMERS = False
 PYTORCH_ENABLE_MPS_FALLBACK = 1
 PYTORCH_MPS_HIGH_WATERMARK_RATIO = 0.0
 GRADIO_SERVER_PORT  =7865
+
+# From old modules/constants.py
+# as in k-diffusion (sampling.py)
+MIN_SEED = 0
+MAX_SEED = 2**63 - 1
+
+AUTH_FILENAME = 'auth.json'
