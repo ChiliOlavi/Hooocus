@@ -1,115 +1,119 @@
-{
+
+
+
+example_task_from_ui = {
     "args": [
-        false,
-        "A car without headlights a banana man happy",
-        "",
-        [
+        False, # Generate image grid
+        "A car without headlights a banana man happy", # Prompt
+        "", # Negative prompt
+        [ # Style selections
             "Fooocus V2",
             "Fooocus Enhance",
             "Fooocus Sharp",
             "SAI Neonpunk"
         ],
-        "Quality",
-        "1152\u00d7896 <span style=\"color: grey;\"> \u2223 9:7</span>",
-        2,
-        "png",
-        "4524879730836419225",
-        false,
-        15.928,
-        4,
-        "juggernautXL_v8Rundiffusion.safetensors",
-        "None",
-        0.5,
-        true,
+        "Quality", # Performance selection
+        "1152\u00d7896 <span style=\'color: grey;\'> \u2223 9:7</span>", # Aspect ratios selection
+        2, # Image number
+        "png", # Output format
+        "4524879730836419225", # Seed
+        False, # Read wildcards in order
+        15.928, # Sharpness
+        4, # CFG scale
+        "juggernautXL_v8Rundiffusion.safetensors", # Base model name
+        "None", # Refiner model name
+        
+        0.5, # loras ((bool, str, float) for default_max_lora_number)
+        True,
         "sd_xl_offset_example-lora_1.0.safetensors",
         0.1,
-        true,
+        True,
         "None",
         1,
-        true,
+        True,
         "None",
         1,
-        true,
+        True,
         "None",
         1,
-        true,
-        "None",
-        1,
-        false,
-        "uov",
-        "Disabled",
-        null,
-        [],
-        null,
-        "",
-        null,
-        false,
-        false,
-        false,
-        false,
-        1.5,
-        0.8,
-        0.3,
-        7,
-        2,
-        "dpmpp_2m_sde_gpu",
-        "karras",
-        "Default (model)",
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        false,
-        false,
-        false,
-        false,
-        64,
-        128,
-        "joint",
-        0.25,
-        false,
-        1.01,
-        1.02,
-        0.99,
-        0.95,
-        false,
-        false,
-        "v2.6",
-        1,
-        0.618,
-        false,
-        false,
+        True,
+        "None", 
+        1, # Loras end
+        False, # Input image checkbox
+        "uov", # Current tab
+        "Disabled", # UOV method
+        None, # UOV input image
+        [], # Outpaint selections
+        None, # Inpaint input image
+        "", # Inpaint additional prompt
+        None, # Inpaint mask image upload
+        False, # Disable preview
+        False, # Disable intermediate results
+        False, # Disable seed increment
+        False, # Black out NSFW
+        1.5, # ADM scaler positive
+        0.8, # ADM scaler negative
+        0.3, # ADM scaler end
+        7, # Adaptive CFG
+        2, # Clip skip
+        "dpmpp_2m_sde_gpu", # Sampler name
+        "karras", # Scheduler name
+        "Default (model)", # VAE name
+        -1, # Overwrite step
+        -1, # Overwrite switch
+        -1, # Overwrite width
+        -1, # Overwrite height
+        -1, # Overwrite vary strength
+        -1, # Overwrite upscale strength
+        False, # Mixing image prompt and vary upscale
+        False, # Mixing image prompt and inpaint
+        False, # Debugging CN preprocessor
+        False, # Skipping CN preprocessor
+        64, # Canny low threshold
+        128, # Canny high threshold
+        "joint", # Refiner swap method
+        0.25, # Controlnet softness
+        False, # Freeu enabled
+        1.01, # Freeu b1
+        1.02, # Freeu b2
+        0.99, # Freeu s1
+        0.95, # Freeu s2
+        False, # Debugging inpaint preprocessor
+        False, # Inpaint disable initial latent
+        "v2.6", # Inpaint engine
+        1, # Inpaint strength
+        0.618, # Inpaint respective field
+        False, # Inpaint advanced masking checkbox
+        False, # Invert mask checkbox
+        0, # Inpaint erode or dilate
+        False, # Save final enhanced image only
+        False, # Save metadata to images
+        "fooocus", # Metadata scheme
+        None, # CN tasks start
+        0.5,
+        0.6,
+        "ImagePrompt",
+        None,
+        0.5,
+        0.6,
+        "ImagePrompt",
+        None,
+        0.5,
+        0.6,
+        "ImagePrompt",
+        None,
+        0.5,
+        0.6,
+        "ImagePrompt", # CN tasks end
+        False,
         0,
-        false,
-        false,
-        "fooocus",
-        null,
-        0.5,
-        0.6,
-        "ImagePrompt",
-        null,
-        0.5,
-        0.6,
-        "ImagePrompt",
-        null,
-        0.5,
-        0.6,
-        "ImagePrompt",
-        null,
-        0.5,
-        0.6,
-        "ImagePrompt",
-        false,
-        0,
-        false,
-        null,
-        false,
+        False,
+        None,
+        False,
         "Disabled",
         "Before First Enhancement",
         "Original Prompts",
-        false,
+        False,
         "",
         "",
         "",
@@ -119,13 +123,13 @@
         0.25,
         0.3,
         0,
-        false,
+        False,
         "v2.6",
         1,
         0.618,
         0,
-        false,
-        false,
+        False,
+        False,
         "",
         "",
         "",
@@ -135,13 +139,13 @@
         0.25,
         0.3,
         0,
-        false,
+        False,
         "v2.6",
         1,
         0.618,
         0,
-        false,
-        false,
+        False,
+        False,
         "",
         "",
         "",
@@ -151,19 +155,19 @@
         0.25,
         0.3,
         0,
-        false,
+        False,
         "v2.6",
         1,
         0.618,
         0,
-        false
+        False
     ],
     "yields": [],
     "results": [],
-    "last_stop": false,
-    "processing": false,
+    "last_stop": False,
+    "processing": False,
     "performance_loras": [],
-    "generate_image_grid": false,
+    "generate_image_grid": False,
     "prompt": "A car without headlights a banana man happy",
     "negative_prompt": "",
     "style_selections": [
@@ -175,7 +179,7 @@
     "performance_selection": "<Performance.QUALITY: 'Quality'>",
     "steps": 60,
     "original_steps": 60,
-    "aspect_ratios_selection": "1152×896 <span style="color: grey;"> ∣ 9:7</span>",
+    "aspect_ratios_selection": "1152×896 <span style='color: grey;'> ∣ 9:7</span>",
     "image_number": 2,
     "output_format": "png",
     "seed": 4524879730836419225,
@@ -237,7 +241,7 @@
     "inpaint_erode_or_dilate": 0,
     "save_final_enhanced_image_only": False,
     "save_metadata_to_images": False,
-    "metadata_scheme": <MetadataScheme.FOOOCUS: "fooocus">,
+    "metadata_scheme": "<MetadataScheme.FOOOCUS: 'fooocus'>",
     "cn_tasks": {
         "ImagePrompt": [],
         "PyraCanny": [],
