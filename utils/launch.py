@@ -151,6 +151,3 @@ def download_models(default_model, previous_default_models, checkpoint_downloads
 
     return default_model, checkpoint_downloads
 
-USE_GRADIO = os.environ.get('USE_GRADIO', '0') == '1'
-if os.environ.get('USE_GRADIO', False):
-    from webui import *
