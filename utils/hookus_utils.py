@@ -179,6 +179,8 @@ class ImageGenerationSeed(BaseModel):
     overwrite_vary_strength: float = -1
     overwrite_upscale_strength: float = config.default_overwrite_upscale
 
+    callback_steps: int = -1 # Used in async worker...
+
     
     mixing_image_prompt_and_vary_upscale: bool = False
     mixing_image_prompt_and_inpaint: bool = False
