@@ -123,10 +123,12 @@ class ImageGenerationSeed(BaseModel):
     results: list = []
     last_stop: bool = False
     processing: bool = True
+
     generate_image_grid: bool = False
     prompt: str = "A funny cat"
     negative_prompt: str = ""
     style_selections: list[str] = config.default_styles
+    
     performance_selection: str = DEFAULT_PERFORMANCE_SELECTION
     performance_loras: list = []
     original_steps: int = -1
