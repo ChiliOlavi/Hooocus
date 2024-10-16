@@ -135,7 +135,7 @@ class ImageGenerationSeed(BaseModel):
     performance_loras: list = []
     original_steps: int = -1
     steps: int = -1
-    aspect_ratios_selection: str = config.default_aspect_ratio
+    aspect_ratios_selection: str = config.default_aspect_ratio.replace('×', ' ').split(' ')[:2]
     image_number: int = 1
     output_format: str = config.default_output_format
     
