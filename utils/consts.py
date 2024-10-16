@@ -2,6 +2,7 @@ import os
 PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 USE_GRADIO = 0
+PYTHONFAULTHANDLER=1
 HOOOCUS_VERSION = '0.5.0'
 
 CHECK_UPDATES=False # Check git upstream for updates
