@@ -25,4 +25,4 @@ MAX_SEED = 2**63 - 1
 AUTH_FILENAME = 'auth.json'
 
 # From old modules/constants.py
-PYTORCH_ENABLE_MPS_FALLBACK
+PYTORCH_ENABLE_MPS_FALLBACK = 1
