@@ -16,9 +16,9 @@ import utils.args_manager as args_manager
 from utils.consts import MIN_SEED, MAX_SEED
 
 style_sorter.try_load_sorted_styles(legal_style_names, config.default_styles)
-config.update_files()
 
 all_styles = style_sorter.all_styles
+all_loras = config.lora_filenames
 performance_lora_keys = flags.PerformanceLoRA.__members__.keys()
 performance_keys = flags.Performance.__members__.keys()
 
@@ -40,13 +40,15 @@ class LoraTuple(BaseModel):
         return v
     
     def to_array(self):
-        return [self.enabled, self.model, self.weight]
+        if self.enabled:
+            return [self.model, self.weight] 
 
 
-lora_ctrls_pre = [LoraTuple(enabled=enbled, model=model, weight=weight) for enbled, model, weight in config.default_loras]
+lora_ctrls_pre = [LoraTuple(enabled=enabled, model=model, weight=weight) for enabled, model, weight in config.default_loras if model in all_loras]
 lora_ctrls = []
 for lora in lora_ctrls_pre:
-    lora_ctrls.append(lora.to_array())
+    if lora.enabled:
+        lora_ctrls.append(lora.to_array())
 
 
 
