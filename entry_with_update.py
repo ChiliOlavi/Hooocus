@@ -4,7 +4,7 @@ import dotenv
 
 dotenv.load_dotenv()
 
-CHECK_UPDATES = os.environ.get('CHECK_UPDATES').lower() == 'true'
+from utils.consts import CHECK_UPDATES
 root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(root)
 os.chdir(root)
