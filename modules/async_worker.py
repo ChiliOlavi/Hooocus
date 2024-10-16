@@ -177,7 +177,6 @@ def worker():
     import numpy as np
     import torch
     import time
-    import utils.shared as shared
     import random
     import copy
     import cv2
