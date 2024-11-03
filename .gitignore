@@ -57,3 +57,4 @@ venvi
 .timetracker
 __cache__/hash_cache.json
 .env
+utils/simple_requirements.txt
