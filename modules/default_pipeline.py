@@ -2,8 +2,8 @@ import modules.core as core
 import os
 import torch
 import modules.patch
-import modules.config
-import modules.flags
+import utils.config
+import utils.flags
 import ldm_patched.modules.model_management
 import ldm_patched.modules.latent_formats
 import modules.inpaint_worker
@@ -62,11 +62,11 @@ def assert_model_integrity():
 def refresh_base_model(name, vae_name=None):
     global model_base
 
-    filename = get_file_from_folder_list(name, modules.config.paths_checkpoints)
+    filename = get_file_from_folder_list(name, utils.config.paths_checkpoints)
 
     vae_filename = None
-    if vae_name is not None and vae_name != modules.flags.default_vae:
-        vae_filename = get_file_from_folder_list(vae_name, modules.config.path_vae)
+    if vae_name is not None and vae_name != utils.flags.default_vae:
+        vae_filename = get_file_from_folder_list(vae_name, utils.config.path_vae)
 
     if model_base.filename == filename and model_base.vae_filename == vae_filename:
         return
@@ -82,7 +82,7 @@ def refresh_base_model(name, vae_name=None):
 def refresh_refiner_model(name):
     global model_refiner
 
-    filename = get_file_from_folder_list(name, modules.config.paths_checkpoints)
+    filename = get_file_from_folder_list(name, utils.config.paths_checkpoints)
 
     if model_refiner.filename == filename:
         return
@@ -268,10 +268,10 @@ def refresh_everything(refiner_model_name, base_model_name, loras,
 
 
 refresh_everything(
-    refiner_model_name=modules.config.default_refiner_model_name,
-    base_model_name=modules.config.default_base_model_name,
-    loras=get_enabled_loras(modules.config.default_loras),
-    vae_name=modules.config.default_vae,
+    refiner_model_name=utils.config.default_refiner_model_name,
+    base_model_name=utils.config.default_base_model_name,
+    loras=get_enabled_loras(utils.config.default_loras),
+    vae_name=utils.config.default_vae,
 )
 
 

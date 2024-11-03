@@ -1,7 +1,7 @@
 import os
 import unittest
 
-import modules.flags
+import utils.flags
 from modules import util
 
 

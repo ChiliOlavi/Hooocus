@@ -2,7 +2,6 @@ import numbers
 import os
 import unittest
 
-import modules.flags
 from modules import extra_utils
 
 

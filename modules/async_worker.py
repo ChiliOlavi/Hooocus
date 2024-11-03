@@ -1,4 +1,5 @@
 import threading
+import utils.config as config
 
 from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_settings, patch_all
