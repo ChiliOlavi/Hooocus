@@ -57,7 +57,7 @@ def worker():
     from extras.expansion import safe_str
     from modules.util import (
         remove_empty_str,
-        HWC3,
+        ensure_three_channels,
         resize_image,
         get_image_shape_ceil,
         set_image_shape_ceil,
@@ -264,8 +264,7 @@ def worker():
         current_progress,
     ):
         for task in async_task.cn_tasks[flags.cn_canny]:
-            cn_img, cn_stop, cn_weight = task
-            cn_img = resize_image(HWC3(cn_img), width=width, height=height)
+            cn_img = resize_image(ensure_three_channels(cn_img), width=width, height=height)
 
             if not async_task.skipping_cn_preprocessor:
                 cn_img = preprocessors.canny_pyramid(
@@ -274,7 +273,7 @@ def worker():
                     async_task.canny_high_threshold,
                 )
 
-            cn_img = HWC3(cn_img)
+            cn_img = ensure_three_channels(cn_img)
             task[0] = core.numpy_to_pytorch(cn_img)
             if async_task.debugging_cn_preprocessor:
                 yield_result(
@@ -286,12 +285,12 @@ def worker():
                 )
         for task in async_task.cn_tasks[flags.cn_cpds]:
             cn_img, cn_stop, cn_weight = task
-            cn_img = resize_image(HWC3(cn_img), width=width, height=height)
+            cn_img = resize_image(ensure_three_channels(cn_img), width=width, height=height)
 
             if not async_task.skipping_cn_preprocessor:
                 cn_img = preprocessors.cpds(cn_img)
 
-            cn_img = HWC3(cn_img)
+            cn_img = ensure_three_channels(cn_img)
             task[0] = core.numpy_to_pytorch(cn_img)
             if async_task.debugging_cn_preprocessor:
                 yield_result(
@@ -303,7 +302,7 @@ def worker():
                 )
         for task in async_task.cn_tasks[flags.cn_ip]:
             cn_img, cn_stop, cn_weight = task
-            cn_img = HWC3(cn_img)
+            cn_img = ensure_three_channels(cn_img)
 
             # https://github.com/tencent-ailab/IP-Adapter/blob/d580c50a291566bbf9fc7ac0f760506607297e6d/README.md?plain=1#L75
             cn_img = resize_image(cn_img, width=224, height=224, resize_mode=0)
@@ -319,7 +318,7 @@ def worker():
                 )
         for task in async_task.cn_tasks[flags.cn_ip_face]:
             cn_img, cn_stop, cn_weight = task
-            cn_img = HWC3(cn_img)
+            cn_img = ensure_three_channels(cn_img)
 
             if not async_task.skipping_cn_preprocessor:
                 cn_img = extras.face_crop.crop_image(cn_img)
@@ -1011,7 +1010,7 @@ def worker():
             if async_task.invert_mask_checkbox:
                 inpaint_mask = 255 - inpaint_mask
 
-            inpaint_image = HWC3(inpaint_image)
+            inpaint_image = ensure_three_channels(inpaint_image)
             if (
                 isinstance(inpaint_image, np.ndarray)
                 and isinstance(inpaint_mask, np.ndarray)
@@ -1074,7 +1073,7 @@ def worker():
         ):
             goals.append("enhance")
             skip_prompt_processing = True
-            async_task.enhance_input_image = HWC3(async_task.enhance_input_image)
+            async_task.enhance_input_image = ensure_three_channels(async_task.enhance_input_image)
         return (
             base_model_additional_loras,
             clip_vision_path,
@@ -1101,7 +1100,7 @@ def worker():
         advance_progress=False,
         skip_prompt_processing=False,
     ):
-        uov_input_image = HWC3(uov_input_image)
+        uov_input_image = ensure_three_channels(uov_input_image)
         if "vary" in uov_method:
             goals.append("vary")
         elif "upscale" in uov_method:

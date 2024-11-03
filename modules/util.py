@@ -129,25 +129,41 @@ def set_image_shape_ceil(im, shape_ceil):
 
     return resample_image(im, width=W, height=H)
 
+def ensure_three_channels(image: np.ndarray) -> np.ndarray:
+    """
+    Ensures the input image has 3 color channels (HWC format).
 
-def HWC3(x):
-    assert x.dtype == np.uint8
-    if x.ndim == 2:
-        x = x[:, :, None]
-    assert x.ndim == 3
-    H, W, C = x.shape
-    assert C == 1 or C == 3 or C == 4
-    if C == 3:
-        return x
-    if C == 1:
-        return np.concatenate([x, x, x], axis=2)
-    if C == 4:
-        color = x[:, :, 0:3].astype(np.float32)
-        alpha = x[:, :, 3:4].astype(np.float32) / 255.0
-        y = color * alpha + 255.0 * (1.0 - alpha)
-        y = y.clip(0, 255).astype(np.uint8)
-        return y
+    Args:
+        image (np.ndarray): Input image array. Expected to be of dtype uint8.
 
+    Returns:
+        np.ndarray: Image array with 3 color channels.
+
+    Raises:
+        AssertionError: If the input array does not meet the expected conditions.
+    """
+    assert image.dtype == np.uint8, "Input image must be of type uint8"
+    
+    if image.ndim == 2:
+        image = image[:, :, None]
+    
+    assert image.ndim == 3, "Input image must have 3 dimensions (H, W, C)"
+    
+    height, width, channels = image.shape
+    assert channels in {1, 3, 4}, "Input image must have 1, 3, or 4 channels"
+    
+    if channels == 3:
+        return image
+    
+    if channels == 1:
+        return np.concatenate([image, image, image], axis=2)
+    
+    if channels == 4:
+        color = image[:, :, :3].astype(np.float32)
+        alpha = image[:, :, 3:4].astype(np.float32) / 255.0
+        blended_image = color * alpha + 255.0 * (1.0 - alpha)
+        blended_image = blended_image.clip(0, 255).astype(np.uint8)
+        return blended_image
 
 def remove_empty_str(items, default=None):
     items = [x for x in items if x != ""]
