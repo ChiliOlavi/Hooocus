@@ -2,6 +2,7 @@ import numpy
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Literal, Union
 
+from utils.flags import CONTROLNET_TASK_TYPES
 
 class ControlNetTask(BaseModel):
     cn_img: numpy.ndarray | None = Field(None, description="The ndarray format of the image for the ControlNetTask.")

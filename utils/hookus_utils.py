@@ -16,7 +16,7 @@ from typing import Literal, Optional
 from utils import config
 import modules.style_sorter as style_sorter
 import utils.launch_arguments as launch_arguments
-from utils.consts import MIN_SEED, MAX_SEED
+
 
 
 class LoraTuple(BaseModel):
@@ -34,12 +34,6 @@ class LoraTuple(BaseModel):
         if self.enabled:
             return [self.model, self.weight] 
 
-
-lora_ctrls_pre = [LoraTuple(enabled=enabled, model=model, weight=weight) for enabled, model, weight in config.default_loras if model in all_loras]
-lora_ctrls = []
-for lora in lora_ctrls_pre:
-    if lora.enabled:
-        lora_ctrls.append(lora.to_array())
 
 
 
@@ -126,30 +120,32 @@ class ImageGenerationSeed(BaseModel):
     negative_prompt: str = ""
     style_selections: list[str] = config.default_styles
     
-    performance_selection: str = DEFAULT_PERFORMANCE_SELECTION
+    performance_selection: str = ""
     performance_loras: list = []
     original_steps: int = -1
     steps: int = -1
     aspect_ratios_selection: str = config.default_aspect_ratio.replace('×', ' ').split(' ')[:2]
     image_number: int = Field(1, description="How many images to generate", ge=1)
-    output_format: str = config.default_output_format
+    output_format: flags.LITERAL_OUTPUT_FORMATS = Field("png", description="Output format")
     
-    seed: int = random.randint(MIN_SEED, MAX_SEED)
     read_wildcards_in_order: bool = False # Read wildcards in order
-    sharpness: float = config.default_sample_sharpness
-    cfg_scale: float = config.default_cfg_scale # Aka guidance scale
-    base_model_name: str = config.default_base_model_name 
-    refiner_model_name: str = config.default_refiner_model_name
-    refiner_switch: bool = config.default_refiner_switch
-    loras: list = lora_ctrls
+    seed: int = random.randint(config.MIN_SEED, config.MAX_SEED)
+    sharpness: float = Field(2.0, description="Sharpness", ge=0.0, le=30.0)
+    cfg_scale: float = Field(7.0, description="Higher value means style is cleaner, vivider, and more artistic.", ge=1.0, le=30.0)
+    base_model_name: str = Field("model.safetensors", description="Base model name")
+    refiner_model_name: Optional[str] = Field(None, description="Refiner model name")
+    refiner_switch: float = Field(0.8, description="Refiner switch", ge=0.0, le=1.0)
+    
+    loras: List[LoraTuple] = Field(config.DEFAULT_CONFIG.loras, description="LoRA settings")
+
 
     input_image_checkbox: bool = False
     current_tab: str = config.default_selected_image_input_tab_id
     
-    uov_method: Optional[UPSCALE_OR_VARIATION_MODES] = None
+    uov_method: Optional[flags.UPSCALE_OR_VARIATION_MODES] = None
     uov_input_image: numpy.ndarray = None # TODO: trigger_auto_describe
     
-    outpaint_selections: Optional[OUTPAINT_SELECTIONS | list] = []
+    outpaint_selections: Optional[flags.OUTPAINT_SELECTIONS | list] = []
     inpaint_input_image: numpy.ndarray = None # TODO: trigger_auto_describe
     inpaint_additional_prompt: str = None
     inpaint_mask_image_upload: numpy.ndarray = None
@@ -189,7 +185,7 @@ class ImageGenerationSeed(BaseModel):
     canny_low_threshold: int = 64 # min 0 max 255
 
     canny_high_threshold: int = 128 # min 0 max 255
-    refiner_swap_method: REFINER_SWAP_METHODS = flags.refiner_swap_method
+    refiner_swap_method: flags.REFINER_SWAP_METHODS = flags.refiner_swap_method
     controlnet_softness: float = 0.25 # min 0.0 max 1.0
     freeu_enabled: bool = False
     freeu_b1: float = 1.01 # min 0.0 max 2.0
@@ -227,13 +223,20 @@ class ImageGenerationSeed(BaseModel):
     debugging_enhance_masks_checkbox: bool = False
 
     enhance_input_image: numpy.ndarray = None
-    enhance_checkbox: bool = config.default_enhance_checkbox
-    enhance_uov_method: str = config.default_enhance_uov_method
-    enhance_uov_processing_order: str = config.default_enhance_uov_processing_order
+    enhance_checkbox: bool = Field(False, description="Enable enhacement")
+    enhance_uov_method: Optional[flags.UPSCALE_OR_VARIATION_MODES] = Field(None, description="Enhacement uov method")
+    enhance_uov_processing_order: flags.LITERAL_ENHANCEMENT_UOV_PROCESSING_ORDER = Field(flags.enhancement_uov_before, description="Enhacement uov processing order")
 
     enhance_uov_prompt_type: str = config.default_enhance_uov_prompt_type
     enhance_ctrls: Optional[list[EnhanceMaskCtrls]] = []
-    should_enhance: bool = True if enhance_checkbox and (enhance_uov_method != flags.disabled.casefold() or len(enhance_ctrls) > 0) else False
+    should_enchance: bool = False
+    @field_validator("should_enchance", mode="after")
+    def validate_should_enchance(cls, v):
+        if cls.enhance_checkbox and (cls.enhance_uov_method or len(cls.enhance_ctrls) > 0):
+            return True
+        return False
+    
+
 
     @field_validator("output_format")
     def validate_output_format(cls, v):
@@ -255,14 +258,14 @@ class ImageGenerationSeed(BaseModel):
     
     @field_validator("seed", mode="after")
     def validate_seed(cls, v):
-        if v < MIN_SEED or v > MAX_SEED:
+        if v < config.MIN_SEED or v > config.MAX_SEED:
             raise ValueError(f"Invalid seed value: {v}")
         return v
     
     @field_validator("style_selections")
     def validate_style_selections(cls, v):
         for style in v:
-            if style not in all_styles:
+            if style not in flags.all_styles:
                 raise ValueError(f"Invalid style selection: {style}")
         return v
     
@@ -372,7 +375,7 @@ class ImageGenerationSeed(BaseModel):
 
 
 class SimpleImageSeed(BaseModel):
-    seed: int = random.randint(MIN_SEED, MAX_SEED)
+    seed: int = random.randint(config.MIN_SEED, config.MAX_SEED)
     prompt: str = "A funny cat"
     negative_prompt: str = ""
     

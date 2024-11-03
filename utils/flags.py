@@ -1,4 +1,10 @@
 import sys, os
+from unittest.mock import Base
+
+from pydantic import BaseModel
+
+from modules.extra_utils import get_files_from_folder
+from utils.hookus_utils import LoraTuple
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -7,13 +13,15 @@ from modules import style_sorter
 from utils import config
 from typing import Literal
 
-from modules.sdxl_styles import legal_style_names
+from utils.consts import DEFAULT_PATHS_CONFIG
 
+from modules.sdxl_styles import legal_style_names
 
 
 enhancement_uov_before = "Before First Enhancement"
 enhancement_uov_after = "After Last Enhancement"
 enhancement_uov_processing_order = [enhancement_uov_before, enhancement_uov_after]
+LITERAL_ENHANCEMENT_UOV_PROCESSING_ORDER = Literal["Before First Enhancement", "After Last Enhancement"]
 
 enhancement_uov_prompt_type_original = 'Original Prompts'
 enhancement_uov_prompt_type_last_filled = 'Last Filled Enhancement Prompts'
@@ -79,11 +87,26 @@ cn_cpds = "CPDS"
 ip_list = [cn_ip, cn_canny, cn_cpds, cn_ip_face]
 default_ip = cn_ip
 
-default_parameters = {
-    cn_ip: (0.5, 0.6), cn_ip_face: (0.9, 0.75), cn_canny: (0.5, 1.0), cn_cpds: (0.5, 1.0)
-}  # stop, weight
+class ControlNetTasks:
+    class ImagePrompt(BaseModel):
+        stop = 0.5
+        weight = 0.6
+    
+    class FaceSwap(BaseModel):
+        stop = 0.9
+        weight = 0.75
+    
+    class PyraCanny(BaseModel):
+        stop = 0.5
+        weight = 1.0
+
+    class CPDS(BaseModel):
+        stop = 0.5
+        weight = 1.0
+
 
 output_formats = ['png', 'jpeg', 'webp']
+LITERAL_OUTPUT_FORMATS = Literal['png', 'jpeg', 'webp']
 
 inpaint_mask_models = ['u2net', 'u2netp', 'u2net_human_seg', 'u2net_cloth_seg', 'silueta', 'isnet-general-use', 'isnet-anime', 'sam']
 inpaint_mask_cloth_category = ['full', 'upper', 'lower']
@@ -106,6 +129,52 @@ sdxl_aspect_ratios = [
     '1344*768', '1344*704', '1408*704', '1472*704', '1536*640', '1600*640',
     '1664*576', '1728*576'
 ]
+
+example_enhance_detection_prompts = ['face', 'eye', 'mouth', 'hair', 'hand', 'body']
+example_inpaint_prompts = [
+        'highly detailed face', 
+        'detailed girl face', 
+        'detailed man face', 
+        'detailed hand', 
+        'beautiful eyes']
+
+
+
+model_filenames = []
+lora_filenames = []
+vae_filenames = []
+wildcard_filenames = []
+
+def get_model_filenames(folder_paths, extensions=None, name_filter=None):
+    if extensions is None:
+        extensions = ['.pth', '.ckpt', '.bin', '.safetensors', '.fooocus.patch']
+    files = []
+
+    if not isinstance(folder_paths, list):
+        folder_paths = [folder_paths]
+    for folder in folder_paths:
+        files += get_files_from_folder(folder, extensions, name_filter)
+
+    return files
+
+
+model_filenames = get_model_filenames(DEFAULT_PATHS_CONFIG.path_checkpoints)
+lora_filenames = get_model_filenames(DEFAULT_PATHS_CONFIG.path_loras)
+vae_filenames = get_model_filenames(DEFAULT_PATHS_CONFIG.path_vae)
+wildcard_filenames = get_files_from_folder(DEFAULT_PATHS_CONFIG.path_wildcards, ['.txt'])
+
+def get_presets():
+    preset_folder = 'presets'
+    presets = ['initial']
+    if not os.path.exists(preset_folder):
+        print('No presets found.')
+        return presets
+
+    return presets + [f[:f.index(".json")] for f in os.listdir(preset_folder) if f.endswith('.json')]
+
+available_presets = get_presets()
+
+
 
 
 

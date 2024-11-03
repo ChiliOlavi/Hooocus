@@ -1,185 +1,142 @@
 import os
 import json
-import math
-import numbers
+from typing import List, Optional, Union
 
-import utils.launch_arguments as launch_arguments
+from pydantic import BaseModel, field_validator
+
+from utils.consts import CONFIG_PATH, PARENT_DIR
+from utils.hookus_utils import LoraTuple
 import tempfile
 import utils.flags
-import modules.sdxl_styles
 
 from modules.model_loader import load_file_from_url
 from modules.extra_utils import makedirs_with_log, get_files_from_folder, try_eval_env_var
-from utils.flags import OutputFormat, Performance
+from utils.flags import Performance
+from utils.logging_util import LoggingUtil
+from pydantic import BaseModel, Field
+
+log = LoggingUtil().get_logger()
+
+
+METADATA_SCHEME = "Hooocus"
+PRESET_CHOSEN = "Realistic"
+
+try:
+    with open(f"{PARENT_DIR}/presets/{PRESET_CHOSEN.lower()}.json") as f:
+        PRESET = json.load(f)
+except FileNotFoundError:
+    log.error(f"Could not find preset file for {PRESET_CHOSEN}")
+    PRESET = {}
+
+class LaunchArguments(BaseModel):
+    preset: str = Field(None, description="Apply specified UI preset.")
+    disable_offload_from_vram: bool = Field(False, description="Force loading models to vram when the unload can be avoided.")
+    disable_image_log: bool = Field(False, description="Prevent writing images and logs to the outputs folder.")
+    disable_analytics: bool = Field(False, description="Disables analytics for Gradio.")
+    disable_metadata: bool = Field(False, description="Disables saving metadata to images.")
+    disable_preset_download: bool = Field(False, description="Disables downloading models for presets.")
+    disable_enhance_output_sorting: bool = Field(False, description="Disables enhance output sorting for final image gallery.")
+    enable_auto_describe_image: bool = Field(False, description="Enables automatic description of uov and enhance image when prompt is empty.")
+    always_download_new_model: bool = Field(False, description="Always download newer models.")
+    rebuild_hash_cache: bool = Field(False, description="Generates missing model and LoRA hashes.")
+
+# Put your args here
+DEFAULT_LAUNCH_ARGUMENTS = LaunchArguments()
 
 DEFAULT_PERFORMANCE_SELECTION = Performance.HYPER_SD
 
-def get_config_path(key, default_value):
-    env = os.getenv(key)
-    if env is not None and isinstance(env, str):
-        print(f"Environment: {key} = {env}")
-        return env
-    else:
-        return os.path.abspath(default_value)
+# K-sampling
+MIN_SEED = 0
+MAX_SEED = 2**63 - 1
 
 wildcards_max_bfs_depth = 64
-config_path = get_config_path('config_path', "./config.txt")
-config_example_path = get_config_path('config_example_path', "config_modification_tutorial.txt")
-config_dict = {}
-always_save_keys = []
-visited_keys = []
 
+class HookusConfig(BaseModel):
+    default_model: str = Field(PRESET["default_model"], description="The default model to use.")
+    default_refiner: str = Field(PRESET["default_refiner"], description="The default refiner model to use.")
+    default_refiner_switch: int = Field(PRESET["default_refiner_switch"], description="The default refiner switch to use.")
+    default_loras: List[LoraTuple] = Field(PRESET["default_loras"], description="The default LoRAs to use.")
+    @field_validator("default_loras", mode="before")
+    def validate_default_loras(cls, v):
+        if not isinstance(v, list):
+            raise ValueError("default_loras must be a list.")
+        loras_to_add = [LoraTuple(**lora) for lora in v]
+        return loras_to_add
 
-
-try:
-    with open(os.path.abspath(f'./presets/default.json'), "r", encoding="utf-8") as json_file:
-        config_dict.update(json.load(json_file))
-except Exception as e:
-    print(f'Load default preset failed.')
-    print(e)
-
-try:
-    if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as json_file:
-            config_dict.update(json.load(json_file))
-            always_save_keys = list(config_dict.keys())
-except Exception as e:
-    print(f'Failed to load config file "{config_path}" . The reason is: {str(e)}')
-    print('Please make sure that:')
-    print(f'1. The file "{config_path}" is a valid text file, and you have access to read it.')
-    print('2. Use "\\\\" instead of "\\" when describing paths.')
-    print('3. There is no "," before the last "}".')
-    print('4. All key/value formats are correct.')
-
-
-
-def get_presets():
-    preset_folder = 'presets'
-    presets = ['initial']
-    if not os.path.exists(preset_folder):
-        print('No presets found.')
-        return presets
-
-    return presets + [f[:f.index(".json")] for f in os.listdir(preset_folder) if f.endswith('.json')]
-
-def update_presets():
-    global available_presets
-    available_presets = get_presets()
-
-def try_get_preset_content(preset):
-    if isinstance(preset, str):
-        preset_path = os.path.abspath(f'./presets/{preset.lower()}.json')
-        try:
-            if os.path.exists(preset_path):
-                with open(preset_path, "r", encoding="utf-8") as json_file:
-                    json_content = json.load(json_file)
-                    print(f'Loaded preset: {preset_path}')
-                    return json_content
-            else:
-                raise FileNotFoundError
-        except Exception as e:
-            print(f'Load preset [{preset_path}] failed')
-            print(e)
-    return {}
-
-available_presets = get_presets()
-preset = launch_arguments.args.preset
-config_dict.update(try_get_preset_content(preset))
-
-
-
-def get_dir_or_set_default(key, default_value, as_array=False, make_directory=False):
-    global config_dict, visited_keys, always_save_keys
-
-    if key not in visited_keys:
-        visited_keys.append(key)
-
-    if key not in always_save_keys:
-        always_save_keys.append(key)
-
-    v = os.getenv(key)
-    if v is not None:
-        print(f"Environment: {key} = {v}")
-        config_dict[key] = v
-    else:
-        v = config_dict.get(key, None)
-
-    if isinstance(v, str):
-        if make_directory:
-            makedirs_with_log(v)
-        if os.path.exists(v) and os.path.isdir(v):
-            return v if not as_array else [v]
-    elif isinstance(v, list):
-        if make_directory:
-            for d in v:
-                makedirs_with_log(d)
-        if all([os.path.exists(d) and os.path.isdir(d) for d in v]):
-            return v
-
-    if v is not None:
-        print(f'Failed to load config key: {json.dumps({key:v})} is invalid or does not exist; will use {json.dumps({key:default_value})} instead.')
-    if isinstance(default_value, list):
-        dp = []
-        for path in default_value:
-            abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), path))
-            dp.append(abs_path)
-            os.makedirs(abs_path, exist_ok=True)
-    else:
-        dp = os.path.abspath(os.path.join(os.path.dirname(__file__), default_value))
-        os.makedirs(dp, exist_ok=True)
-        if as_array:
-            dp = [dp]
-    config_dict[key] = dp
-    return dp
-
-
-paths_checkpoints = get_dir_or_set_default('path_checkpoints', ['../models/checkpoints/'], True)
-paths_loras = get_dir_or_set_default('path_loras', ['../models/loras/'], True)
-path_embeddings = get_dir_or_set_default('path_embeddings', '../models/embeddings/')
-path_vae_approx = get_dir_or_set_default('path_vae_approx', '../models/vae_approx/')
-path_vae = get_dir_or_set_default('path_vae', '../models/vae/')
-path_upscale_models = get_dir_or_set_default('path_upscale_models', '../models/upscale_models/')
-path_inpaint = get_dir_or_set_default('path_inpaint', '../models/inpaint/')
-path_controlnet = get_dir_or_set_default('path_controlnet', '../models/controlnet/')
-path_clip_vision = get_dir_or_set_default('path_clip_vision', '../models/clip_vision/')
-path_fooocus_expansion = get_dir_or_set_default('path_fooocus_expansion', '../models/prompt_expansion/fooocus_expansion')
-path_wildcards = get_dir_or_set_default('path_wildcards', '../wildcards/')
-path_safety_checker = get_dir_or_set_default('path_safety_checker', '../models/safety_checker/')
-path_sam = get_dir_or_set_default('path_sam', '../models/sam/')
-
-
-def get_config_item_or_set_default(key, default_value, validator, disable_empty_as_none=False, expected_type=None):
-    global config_dict, visited_keys
-
-    if key not in visited_keys:
-        visited_keys.append(key)
+    default_cfg_scale: float = Field(PRESET["default_cfg_scale"], description="The default cfg scale to use.")
+    default_sample_sharpness: float = Field(PRESET["default_sample_sharpness"], description="The default sample sharpness to use.")
+    default_sampler: str = Field(PRESET["default_sampler"], description="The default sampler to use.")
+    default_scheduler: str = Field(PRESET["default_scheduler"], description="The default scheduler to use.")
+    default_performance: str = Field(PRESET["default_performance"], description="The default performance to use.")
+    default_prompt: str = Field(PRESET["default_prompt"], description="The default prompt to use.")
+    default_prompt_negative: str = Field(PRESET["default_prompt_negative"], description="The default negative prompt to use.")
+    default_styles: List[str] = Field(PRESET["default_styles"], description="The default styles to use.")
+    default_aspect_ratio: str = Field(PRESET["default_aspect_ratio"], description="The default aspect ratio to use.")
+    default_overwrite_step: int = Field(PRESET["default_overwrite_step"], description="The default overwrite step to use.")
+    checkpoint_downloads: dict[str, str] = Field(PRESET["checkpoint_downloads"], description="The default checkpoint downloads to use.")
+    embeddings_downloads: dict[str, str] = Field(PRESET["embeddings_downloads"], description="The default embeddings downloads to use.")
+    previous_default_models: List[str] = Field(PRESET["previous_default_models"], description="The default previous default models to use.")
     
-    v = os.getenv(key)
-    if v is not None:
-        v = try_eval_env_var(v, expected_type)
-        print(f"Environment: {key} = {v}")
-        config_dict[key] = v
+    default_loras_min_weight: float = Field(2, description="The default loras min weight to use.")
+    default_loras_max_weight: float = Field(2, description="The default loras max weight to use.")
+    default_max_lora_number: int = Field(5, description="The default max lora number to use.")
+    default_vae: str = Field("Default (model)", description="The default vae to use.")
+    
+    should_use_image_input: bool = Field(False, description="Bool: should use image input?")
+    should_use_image_prompt_advanced: bool = Field(False, description="Bool: should use image prompt advanced?")
+    should_enhance_image: bool = Field(False, description="Bool: should enhance image?")
+    should_use_advanced: bool = Field(False, description="Bool: should use advanced checkbox?")
+    should_use_developer_debug_mode: bool = Field(False, description="Bool: default developer debug mode.")
+    should_use_advanced_inpaint_masking: bool = Field(False, description="Bool: should use advanced inpaint masking?")
+    
+    default_controlnet_image_count: int = Field(4, description="The default controlnet image count to use.")
+    default_max_image_number: int = Field(32, description="The default max image number to use.")
+    default_image_number: int = Field(2, description="The default image number to use.")
+    lora_downloads: dict[str, str] = Field({}, description="The default lora downloads to use.")
+    vae_downloads: dict[str, str] = Field({}, description="The default vae downloads to use.")
+    available_aspect_ratios: List[str] = Field(utils.flags.sdxl_aspect_ratios, description="The available aspect ratios to use.")
+    default_inpaint_engine_version: str = Field("v2.6", description="The default inpaint engine version to use.")
+    image_input_mode: str = Field("uov_tab", description="The image input mode to use.") # utils.flags.input_image_tab_ids 
+    default_inpaint_method: str = Field("Inpaint or Outpaint (default)", description="The default inpaint method to use.")
+    default_uov_method: Optional[str] = Field(None, description="The default uov method to use.")
+    
+    default_cfg_tsnr: float = Field(7.0, description="The default cfg tsnr to use.")
+    default_clip_skip: int = Field(2, description="The default clip skip to use.")
+    default_overwrite_switch: int = Field(-1, description="The default overwrite switch to use.")
+    default_overwrite_upscale: float = Field(-1, description="The default overwrite upscale to use.")
 
-    if key not in config_dict:
-        config_dict[key] = default_value
-        return default_value
 
-    v = config_dict.get(key, None)
-    if not disable_empty_as_none:
-        if v is None or v == '':
-            v = 'None'
-    if validator(v):
-        return v
-    else:
-        if v is not None:
-            print(f'Failed to load config key: {json.dumps({key:v})} is invalid; will use {json.dumps({key:default_value})} instead.')
-        config_dict[key] = default_value
-        return default_value
+
+    default_enhance_tabs: int = Field(3, description="The default enhance tabs to use.")
+    default_enhance_uov_method: Optional[str] = Field(None, description="The default enhance uov method to use.")
+    default_enhance_uov_processing_order: int = Field(utils.flags.enhancement_uov_before, description="The default enhance uov processing order to use.")
+    default_enhance_uov_prompt_type: int = Field(utils.flags.enhancement_uov_prompt_type_original, description="The default enhance uov prompt type to use.")
+    default_sam_max_detections: int = Field(0, description="The default sam max detections to use.")
+    default_black_out_nsfw: bool = Field(False, description="The default black out nsfw to use.")
+    
+    default_save_only_final_enhanced_image: bool = Field(False, description="The default save only final enhanced image to use.")
+    default_save_metadata_to_images: bool = Field(False, description="The default save metadata to images to use.")
+    default_metadata_scheme: str = Field("Hooocus", description="The default metadata scheme to use.")
+    metadata_created_by: str = Field("", description="The metadata created by to use.")
+
+    should_use_invert_mask: bool = Field(False, description="Bool: should use invert mask checkbox?")
+    default_invert_mask_model: str = Field('isnet-general-use', description="The default invert mask model to use.")
+    default_enhance_inpaint_mask_model: str = Field('sam', description="The default enhance inpaint mask model to use.")
+    default_inpaint_mask_cloth_category: str = Field('full', description="The default inpaint mask cloth category to use.")
+    default_inpaint_mask_sam_model: str = Field('vit_b', description="The default inpaint mask sam model to use.")
+    default_inpaint_stop_ats: List[float] = Field([0.5, 0.5, 0.5, 0.5], description="The default inpaint stop ats to use.")
+    default_describe_apply_prompts_checkbox: bool = Field(True, description="The default describe apply prompts checkbox to use.")
+    default_describe_content_type: List[str] = Field([utils.flags.describe_type_photo], description="The default describe content type to use.")
+
+    default_temp_path: str = Field(os.path.join(tempfile.gettempdir(), 'hooocus'), description="The default temp path to use.")
+    temp_path_cleanup_on_launch: bool = Field(True, description="The temp path cleanup on launch to use.")
+
+DEFAULT_CONFIG = HookusConfig(**PRESET)
+
 
 
 def init_temp_path(path: str | None, default_path: str) -> str:
-    if launch_arguments.args.temp_path:
-        path = launch_arguments.args.temp_path
+    path = DEFAULT_CONFIG.default_temp_path if path is None else path
 
     if path != '' and path != default_path:
         try:
@@ -195,748 +152,3 @@ def init_temp_path(path: str | None, default_path: str) -> str:
     os.makedirs(default_path, exist_ok=True)
     return default_path
 
-
-default_temp_path = os.path.join(tempfile.gettempdir(), 'fooocus')
-temp_path = init_temp_path(get_config_item_or_set_default(
-    key='temp_path',
-    default_value=default_temp_path,
-    validator=lambda x: isinstance(x, str),
-    expected_type=str
-), default_temp_path)
-temp_path_cleanup_on_launch = get_config_item_or_set_default(
-    key='temp_path_cleanup_on_launch',
-    default_value=True,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_base_model_name = default_model = get_config_item_or_set_default(
-    key='default_model',
-    default_value='model.safetensors',
-    validator=lambda x: isinstance(x, str),
-    expected_type=str
-)
-previous_default_models = get_config_item_or_set_default(
-    key='previous_default_models',
-    default_value=[],
-    validator=lambda x: isinstance(x, list) and all(isinstance(k, str) for k in x),
-    expected_type=list
-)
-default_refiner_model_name = default_refiner = get_config_item_or_set_default(
-    key='default_refiner',
-    default_value='None',
-    validator=lambda x: isinstance(x, str),
-    expected_type=str
-)
-default_refiner_switch = get_config_item_or_set_default(
-    key='default_refiner_switch',
-    default_value=0.8,
-    validator=lambda x: isinstance(x, numbers.Number) and 0 <= x <= 1,
-    expected_type=numbers.Number
-)
-default_loras_min_weight = get_config_item_or_set_default(
-    key='default_loras_min_weight',
-    default_value=-2,
-    validator=lambda x: isinstance(x, numbers.Number) and -10 <= x <= 10,
-    expected_type=numbers.Number
-)
-default_loras_max_weight = get_config_item_or_set_default(
-    key='default_loras_max_weight',
-    default_value=2,
-    validator=lambda x: isinstance(x, numbers.Number) and -10 <= x <= 10,
-    expected_type=numbers.Number
-)
-default_loras = get_config_item_or_set_default(
-    key='default_loras',
-    default_value=[
-        [
-            True,
-            "None",
-            1.0
-        ],
-        [
-            True,
-            "None",
-            1.0
-        ],
-        [
-            True,
-            "None",
-            1.0
-        ],
-        [
-            True,
-            "None",
-            1.0
-        ],
-        [
-            True,
-            "None",
-            1.0
-        ]
-    ],
-    validator=lambda x: isinstance(x, list) and all(
-        len(y) == 3 and isinstance(y[0], bool) and isinstance(y[1], str) and isinstance(y[2], numbers.Number)
-        or len(y) == 2 and isinstance(y[0], str) and isinstance(y[1], numbers.Number)
-        for y in x),
-    expected_type=list
-)
-default_loras = [(y[0], y[1], y[2]) if len(y) == 3 else (True, y[0], y[1]) for y in default_loras]
-default_max_lora_number = get_config_item_or_set_default(
-    key='default_max_lora_number',
-    default_value=len(default_loras) if isinstance(default_loras, list) and len(default_loras) > 0 else 5,
-    validator=lambda x: isinstance(x, int) and x >= 1,
-    expected_type=int
-)
-default_cfg_scale = get_config_item_or_set_default(
-    key='default_cfg_scale',
-    default_value=7.0,
-    validator=lambda x: isinstance(x, numbers.Number),
-    expected_type=numbers.Number
-)
-default_sample_sharpness = get_config_item_or_set_default(
-    key='default_sample_sharpness',
-    default_value=2.0,
-    validator=lambda x: isinstance(x, numbers.Number),
-    expected_type=numbers.Number
-)
-default_sampler = get_config_item_or_set_default(
-    key='default_sampler',
-    default_value='dpmpp_2m_sde_gpu',
-    validator=lambda x: x in utils.flags.sampler_list,
-    expected_type=str
-)
-default_scheduler = get_config_item_or_set_default(
-    key='default_scheduler',
-    default_value='karras',
-    validator=lambda x: x in utils.flags.scheduler_list,
-    expected_type=str
-)
-default_vae = get_config_item_or_set_default(
-    key='default_vae',
-    default_value=utils.flags.default_vae,
-    validator=lambda x: isinstance(x, str),
-    expected_type=str
-)
-default_styles = get_config_item_or_set_default(
-    key='default_styles',
-    default_value=[
-        "Fooocus V2",
-        "Fooocus Enhance",
-        "Fooocus Sharp"
-    ],
-    validator=lambda x: isinstance(x, list) and all(y in modules.sdxl_styles.legal_style_names for y in x),
-    expected_type=list
-)
-default_prompt_negative = get_config_item_or_set_default(
-    key='default_prompt_negative',
-    default_value='',
-    validator=lambda x: isinstance(x, str),
-    disable_empty_as_none=True,
-    expected_type=str
-)
-default_prompt = get_config_item_or_set_default(
-    key='default_prompt',
-    default_value='',
-    validator=lambda x: isinstance(x, str),
-    disable_empty_as_none=True,
-    expected_type=str
-)
-default_performance = get_config_item_or_set_default(
-    key='default_performance',
-    default_value=Performance.SPEED.value,
-    validator=lambda x: x in Performance.values(),
-    expected_type=str
-)
-default_image_prompt_checkbox = get_config_item_or_set_default(
-    key='default_image_prompt_checkbox',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_enhance_checkbox = get_config_item_or_set_default(
-    key='default_enhance_checkbox',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_advanced_checkbox = get_config_item_or_set_default(
-    key='default_advanced_checkbox',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_developer_debug_mode_checkbox = get_config_item_or_set_default(
-    key='default_developer_debug_mode_checkbox',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_image_prompt_advanced_checkbox = get_config_item_or_set_default(
-    key='default_image_prompt_advanced_checkbox',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_max_image_number = get_config_item_or_set_default(
-    key='default_max_image_number',
-    default_value=32,
-    validator=lambda x: isinstance(x, int) and x >= 1,
-    expected_type=int
-)
-default_output_format = get_config_item_or_set_default(
-    key='default_output_format',
-    default_value='png',
-    validator=lambda x: x in OutputFormat.list(),
-    expected_type=str
-)
-default_image_number = get_config_item_or_set_default(
-    key='default_image_number',
-    default_value=2,
-    validator=lambda x: isinstance(x, int) and 1 <= x <= default_max_image_number,
-    expected_type=int
-)
-checkpoint_downloads = get_config_item_or_set_default(
-    key='checkpoint_downloads',
-    default_value={},
-    validator=lambda x: isinstance(x, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in x.items()),
-    expected_type=dict
-)
-lora_downloads = get_config_item_or_set_default(
-    key='lora_downloads',
-    default_value={},
-    validator=lambda x: isinstance(x, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in x.items()),
-    expected_type=dict
-)
-embeddings_downloads = get_config_item_or_set_default(
-    key='embeddings_downloads',
-    default_value={},
-    validator=lambda x: isinstance(x, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in x.items()),
-    expected_type=dict
-)
-vae_downloads = get_config_item_or_set_default(
-    key='vae_downloads',
-    default_value={},
-    validator=lambda x: isinstance(x, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in x.items()),
-    expected_type=dict
-)
-available_aspect_ratios = get_config_item_or_set_default(
-    key='available_aspect_ratios',
-    default_value=utils.flags.sdxl_aspect_ratios,
-    validator=lambda x: isinstance(x, list) and all('*' in v for v in x) and len(x) > 1,
-    expected_type=list
-)
-default_aspect_ratio = get_config_item_or_set_default(
-    key='default_aspect_ratio',
-    default_value='1152*896' if '1152*896' in available_aspect_ratios else available_aspect_ratios[0],
-    validator=lambda x: x in available_aspect_ratios,
-    expected_type=str
-)
-default_inpaint_engine_version = get_config_item_or_set_default(
-    key='default_inpaint_engine_version',
-    default_value='v2.6',
-    validator=lambda x: x in utils.flags.inpaint_engine_versions,
-    expected_type=str
-)
-default_selected_image_input_tab_id = get_config_item_or_set_default(
-    key='default_selected_image_input_tab_id',
-    default_value=utils.flags.default_input_image_tab,
-    validator=lambda x: x in utils.flags.input_image_tab_ids,
-    expected_type=str
-)
-default_uov_method = get_config_item_or_set_default(
-    key='default_uov_method',
-    default_value=modules.flags.disabled,
-    validator=lambda x: x in modules.flags.uov_list,
-    expected_type=str
-)
-# TODO⬇
-default_controlnet_image_count = get_config_item_or_set_default(
-    key='default_controlnet_image_count',
-    default_value=4,
-    validator=lambda x: isinstance(x, int) and x > 0,
-    expected_type=int
-)
-default_ip_images = {}
-default_ip_stop_ats = {}
-default_ip_weights = {}
-default_ip_types = {}
-
-for image_count in range(default_controlnet_image_count):
-    image_count += 1
-    default_ip_images[image_count] = get_config_item_or_set_default(
-        key=f'default_ip_image_{image_count}',
-        default_value='None',
-        validator=lambda x: x == 'None' or isinstance(x, str) and os.path.exists(x),
-        expected_type=str
-    )
-
-    if default_ip_images[image_count] == 'None':
-        default_ip_images[image_count] = None
-
-    default_ip_types[image_count] = get_config_item_or_set_default(
-        key=f'default_ip_type_{image_count}',
-        default_value=utils.flags.default_ip,
-        validator=lambda x: x in utils.flags.ip_list,
-        expected_type=str
-    )
-
-    default_end, default_weight = utils.flags.default_parameters[default_ip_types[image_count]]
-
-    default_ip_stop_ats[image_count] = get_config_item_or_set_default(
-        key=f'default_ip_stop_at_{image_count}',
-        default_value=default_end,
-        validator=lambda x: isinstance(x, float) and 0 <= x <= 1,
-        expected_type=float
-    )
-    default_ip_weights[image_count] = get_config_item_or_set_default(
-        key=f'default_ip_weight_{image_count}',
-        default_value=default_weight,
-        validator=lambda x: isinstance(x, float) and 0 <= x <= 2,
-        expected_type=float
-    )
-# TODO ⬆
-default_inpaint_advanced_masking_checkbox = get_config_item_or_set_default(
-    key='default_inpaint_advanced_masking_checkbox',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_inpaint_method = get_config_item_or_set_default(
-    key='default_inpaint_method',
-    default_value=utils.flags.inpaint_option_default,
-    validator=lambda x: x in utils.flags.inpaint_options,
-    expected_type=str
-)
-default_cfg_tsnr = get_config_item_or_set_default(
-    key='default_cfg_tsnr',
-    default_value=7.0,
-    validator=lambda x: isinstance(x, numbers.Number),
-    expected_type=numbers.Number
-)
-default_clip_skip = get_config_item_or_set_default(
-    key='default_clip_skip',
-    default_value=2,
-    validator=lambda x: isinstance(x, int) and 1 <= x <= utils.flags.clip_skip_max,
-    expected_type=int
-)
-default_overwrite_step = get_config_item_or_set_default(
-    key='default_overwrite_step',
-    default_value=-1,
-    validator=lambda x: isinstance(x, int),
-    expected_type=int
-)
-default_overwrite_switch = get_config_item_or_set_default(
-    key='default_overwrite_switch',
-    default_value=-1,
-    validator=lambda x: isinstance(x, int),
-    expected_type=int
-)
-default_overwrite_upscale = get_config_item_or_set_default(
-    key='default_overwrite_upscale',
-    default_value=-1,
-    validator=lambda x: isinstance(x, numbers.Number)
-)
-example_inpaint_prompts = get_config_item_or_set_default(
-    key='example_inpaint_prompts',
-    default_value=[
-        'highly detailed face', 'detailed girl face', 'detailed man face', 'detailed hand', 'beautiful eyes'
-    ],
-    validator=lambda x: isinstance(x, list) and all(isinstance(v, str) for v in x),
-    expected_type=list
-)
-example_enhance_detection_prompts = get_config_item_or_set_default(
-    key='example_enhance_detection_prompts',
-    default_value=[
-        'face', 'eye', 'mouth', 'hair', 'hand', 'body'
-    ],
-    validator=lambda x: isinstance(x, list) and all(isinstance(v, str) for v in x),
-    expected_type=list
-)
-default_enhance_tabs = get_config_item_or_set_default(
-    key='default_enhance_tabs',
-    default_value=3,
-    validator=lambda x: isinstance(x, int) and 1 <= x <= 5,
-    expected_type=int
-)
-default_enhance_uov_method = get_config_item_or_set_default(
-    key='default_enhance_uov_method',
-    default_value=modules.flags.disabled,
-    validator=lambda x: x in modules.flags.uov_list,
-    expected_type=int
-)
-default_enhance_uov_processing_order = get_config_item_or_set_default(
-    key='default_enhance_uov_processing_order',
-    default_value=utils.flags.enhancement_uov_before,
-    validator=lambda x: x in utils.flags.enhancement_uov_processing_order,
-    expected_type=int
-)
-default_enhance_uov_prompt_type = get_config_item_or_set_default(
-    key='default_enhance_uov_prompt_type',
-    default_value=utils.flags.enhancement_uov_prompt_type_original,
-    validator=lambda x: x in utils.flags.enhancement_uov_prompt_types,
-    expected_type=int
-)
-default_sam_max_detections = get_config_item_or_set_default(
-    key='default_sam_max_detections',
-    default_value=0,
-    validator=lambda x: isinstance(x, int) and 0 <= x <= 10,
-    expected_type=int
-)
-default_black_out_nsfw = get_config_item_or_set_default(
-    key='default_black_out_nsfw',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_save_only_final_enhanced_image = get_config_item_or_set_default(
-    key='default_save_only_final_enhanced_image',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_save_metadata_to_images = get_config_item_or_set_default(
-    key='default_save_metadata_to_images',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_metadata_scheme = get_config_item_or_set_default(
-    key='default_metadata_scheme',
-    default_value=MetadataScheme.FOOOCUS.value,
-    validator=lambda x: x in [y[1] for y in modules.flags.metadata_scheme if y[1] == x],
-    expected_type=str
-)
-metadata_created_by = get_config_item_or_set_default(
-    key='metadata_created_by',
-    default_value='',
-    validator=lambda x: isinstance(x, str),
-    expected_type=str
-)
-
-example_inpaint_prompts = [[x] for x in example_inpaint_prompts]
-example_enhance_detection_prompts = [[x] for x in example_enhance_detection_prompts]
-
-default_invert_mask_checkbox = get_config_item_or_set_default(
-    key='default_invert_mask_checkbox',
-    default_value=False,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-
-default_inpaint_mask_model = get_config_item_or_set_default(
-    key='default_inpaint_mask_model',
-    default_value='isnet-general-use',
-    validator=lambda x: x in utils.flags.inpaint_mask_models,
-    expected_type=str
-)
-
-default_enhance_inpaint_mask_model = get_config_item_or_set_default(
-    key='default_enhance_inpaint_mask_model',
-    default_value='sam',
-    validator=lambda x: x in utils.flags.inpaint_mask_models,
-    expected_type=str
-)
-
-default_inpaint_mask_cloth_category = get_config_item_or_set_default(
-    key='default_inpaint_mask_cloth_category',
-    default_value='full',
-    validator=lambda x: x in utils.flags.inpaint_mask_cloth_category,
-    expected_type=str
-)
-
-default_inpaint_mask_sam_model = get_config_item_or_set_default(
-    key='default_inpaint_mask_sam_model',
-    default_value='vit_b',
-    validator=lambda x: x in utils.flags.inpaint_mask_sam_model,
-    expected_type=str
-)
-
-default_describe_apply_prompts_checkbox = get_config_item_or_set_default(
-    key='default_describe_apply_prompts_checkbox',
-    default_value=True,
-    validator=lambda x: isinstance(x, bool),
-    expected_type=bool
-)
-default_describe_content_type = get_config_item_or_set_default(
-    key='default_describe_content_type',
-    default_value=[utils.flags.describe_type_photo],
-    validator=lambda x: all(k in utils.flags.describe_types for k in x),
-    expected_type=list
-)
-
-config_dict["default_loras"] = default_loras = default_loras[:default_max_lora_number] + [[True, 'None', 1.0] for _ in range(default_max_lora_number - len(default_loras))]
-
-# mapping config to meta parameter
-possible_preset_keys = {
-    "default_model": "base_model",
-    "default_refiner": "refiner_model",
-    "default_refiner_switch": "refiner_switch",
-    "previous_default_models": "previous_default_models",
-    "default_loras_min_weight": "default_loras_min_weight",
-    "default_loras_max_weight": "default_loras_max_weight",
-    "default_loras": "<processed>",
-    "default_cfg_scale": "guidance_scale",
-    "default_sample_sharpness": "sharpness",
-    "default_cfg_tsnr": "adaptive_cfg",
-    "default_clip_skip": "clip_skip",
-    "default_sampler": "sampler",
-    "default_scheduler": "scheduler",
-    "default_overwrite_step": "steps",
-    "default_overwrite_switch": "overwrite_switch",
-    "default_performance": "performance",
-    "default_image_number": "image_number",
-    "default_prompt": "prompt",
-    "default_prompt_negative": "negative_prompt",
-    "default_styles": "styles",
-    "default_aspect_ratio": "resolution",
-    "default_save_metadata_to_images": "default_save_metadata_to_images",
-    "checkpoint_downloads": "checkpoint_downloads",
-    "embeddings_downloads": "embeddings_downloads",
-    "lora_downloads": "lora_downloads",
-    "vae_downloads": "vae_downloads",
-    "default_vae": "vae",
-    # "default_inpaint_method": "inpaint_method", # disabled so inpaint mode doesn't refresh after every preset change
-    "default_inpaint_engine_version": "inpaint_engine_version",
-}
-
-REWRITE_PRESET = False
-
-if REWRITE_PRESET and isinstance(launch_arguments.args.preset, str):
-    save_path = 'presets/' + launch_arguments.args.preset + '.json'
-    with open(save_path, "w", encoding="utf-8") as json_file:
-        json.dump({k: config_dict[k] for k in possible_preset_keys}, json_file, indent=4)
-    print(f'Preset saved to {save_path}. Exiting ...')
-    exit(0)
-
-
-def add_ratio(x):
-    a, b = x.replace('*', ' ').split(' ')[:2]
-    a, b = int(a), int(b)
-    g = math.gcd(a, b)
-    return f'{a}×{b} <span style="color: grey;"> \U00002223 {a // g}:{b // g}</span>'
-
-
-default_aspect_ratio = add_ratio(default_aspect_ratio)
-available_aspect_ratios_labels = [add_ratio(x) for x in available_aspect_ratios]
-
-
-# Only write config in the first launch.
-if not os.path.exists(config_path):
-    with open(config_path, "w", encoding="utf-8") as json_file:
-        json.dump({k: config_dict[k] for k in always_save_keys}, json_file, indent=4)
-
-
-# Always write tutorials.
-with open(config_example_path, "w", encoding="utf-8") as json_file:
-    cpa = config_path.replace("\\", "\\\\")
-    json_file.write(f'You can modify your "{cpa}" using the below keys, formats, and examples.\n'
-                    f'Do not modify this file. Modifications in this file will not take effect.\n'
-                    f'This file is a tutorial and example. Please edit "{cpa}" to really change any settings.\n'
-                    + 'Remember to split the paths with "\\\\" rather than "\\", '
-                      'and there is no "," before the last "}". \n\n\n')
-    json.dump({k: config_dict[k] for k in visited_keys}, json_file, indent=4)
-
-model_filenames = []
-lora_filenames = []
-vae_filenames = []
-wildcard_filenames = []
-
-
-def get_model_filenames(folder_paths, extensions=None, name_filter=None):
-    if extensions is None:
-        extensions = ['.pth', '.ckpt', '.bin', '.safetensors', '.fooocus.patch']
-    files = []
-
-    if not isinstance(folder_paths, list):
-        folder_paths = [folder_paths]
-    for folder in folder_paths:
-        files += get_files_from_folder(folder, extensions, name_filter)
-
-    return files
-
-
-def update_files():
-    global model_filenames, lora_filenames, vae_filenames, wildcard_filenames, available_presets
-    model_filenames = get_model_filenames(paths_checkpoints)
-    lora_filenames = get_model_filenames(paths_loras)
-    vae_filenames = get_model_filenames(path_vae)
-    wildcard_filenames = get_files_from_folder(path_wildcards, ['.txt'])
-    available_presets = get_presets()
-    return
-
-
-def downloading_inpaint_models(v):
-    assert v in utils.flags.inpaint_engine_versions
-
-    load_file_from_url(
-        url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/fooocus_inpaint_head.pth',
-        model_dir=path_inpaint,
-        file_name='fooocus_inpaint_head.pth'
-    )
-    head_file = os.path.join(path_inpaint, 'fooocus_inpaint_head.pth')
-    patch_file = None
-
-    if v == 'v1':
-        load_file_from_url(
-            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint.fooocus.patch',
-            model_dir=path_inpaint,
-            file_name='inpaint.fooocus.patch'
-        )
-        patch_file = os.path.join(path_inpaint, 'inpaint.fooocus.patch')
-
-    if v == 'v2.5':
-        load_file_from_url(
-            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v25.fooocus.patch',
-            model_dir=path_inpaint,
-            file_name='inpaint_v25.fooocus.patch'
-        )
-        patch_file = os.path.join(path_inpaint, 'inpaint_v25.fooocus.patch')
-
-    if v == 'v2.6':
-        load_file_from_url(
-            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v26.fooocus.patch',
-            model_dir=path_inpaint,
-            file_name='inpaint_v26.fooocus.patch'
-        )
-        patch_file = os.path.join(path_inpaint, 'inpaint_v26.fooocus.patch')
-
-    return head_file, patch_file
-
-
-def downloading_sdxl_lcm_lora():
-    load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/sdxl_lcm_lora.safetensors',
-        model_dir=paths_loras[0],
-        file_name=utils.flags.PerformanceLoRA.EXTREME_SPEED.value
-    )
-    return utils.flags.PerformanceLoRA.EXTREME_SPEED.value
-
-
-def downloading_sdxl_lightning_lora():
-    load_file_from_url(
-        url='https://huggingface.co/mashb1t/misc/resolve/main/sdxl_lightning_4step_lora.safetensors',
-        model_dir=paths_loras[0],
-        file_name=utils.flags.PerformanceLoRA.LIGHTNING.value
-    )
-    return utils.flags.PerformanceLoRA.LIGHTNING.value
-
-
-def downloading_sdxl_hyper_sd_lora():
-    load_file_from_url(
-        url='https://huggingface.co/mashb1t/misc/resolve/main/sdxl_hyper_sd_4step_lora.safetensors',
-        model_dir=paths_loras[0],
-        file_name=utils.flags.PerformanceLoRA.HYPER_SD.value
-    )
-    return utils.flags.PerformanceLoRA.HYPER_SD.value
-
-
-def downloading_controlnet_canny():
-    load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors',
-        model_dir=path_controlnet,
-        file_name='control-lora-canny-rank128.safetensors'
-    )
-    return os.path.join(path_controlnet, 'control-lora-canny-rank128.safetensors')
-
-
-def downloading_controlnet_cpds():
-    load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors',
-        model_dir=path_controlnet,
-        file_name='fooocus_xl_cpds_128.safetensors'
-    )
-    return os.path.join(path_controlnet, 'fooocus_xl_cpds_128.safetensors')
-
-
-def downloading_ip_adapters(v):
-    assert v in ['ip', 'face']
-
-    results = []
-
-    load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/clip_vision_vit_h.safetensors',
-        model_dir=path_clip_vision,
-        file_name='clip_vision_vit_h.safetensors'
-    )
-    results += [os.path.join(path_clip_vision, 'clip_vision_vit_h.safetensors')]
-
-    load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_ip_negative.safetensors',
-        model_dir=path_controlnet,
-        file_name='fooocus_ip_negative.safetensors'
-    )
-    results += [os.path.join(path_controlnet, 'fooocus_ip_negative.safetensors')]
-
-    if v == 'ip':
-        load_file_from_url(
-            url='https://huggingface.co/lllyasviel/misc/resolve/main/ip-adapter-plus_sdxl_vit-h.bin',
-            model_dir=path_controlnet,
-            file_name='ip-adapter-plus_sdxl_vit-h.bin'
-        )
-        results += [os.path.join(path_controlnet, 'ip-adapter-plus_sdxl_vit-h.bin')]
-
-    if v == 'face':
-        load_file_from_url(
-            url='https://huggingface.co/lllyasviel/misc/resolve/main/ip-adapter-plus-face_sdxl_vit-h.bin',
-            model_dir=path_controlnet,
-            file_name='ip-adapter-plus-face_sdxl_vit-h.bin'
-        )
-        results += [os.path.join(path_controlnet, 'ip-adapter-plus-face_sdxl_vit-h.bin')]
-
-    return results
-
-
-def downloading_upscale_model():
-    load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin',
-        model_dir=path_upscale_models,
-        file_name='fooocus_upscaler_s409985e5.bin'
-    )
-    return os.path.join(path_upscale_models, 'fooocus_upscaler_s409985e5.bin')
-
-def downloading_safety_checker_model():
-    load_file_from_url(
-        url='https://huggingface.co/mashb1t/misc/resolve/main/stable-diffusion-safety-checker.bin',
-        model_dir=path_safety_checker,
-        file_name='stable-diffusion-safety-checker.bin'
-    )
-    return os.path.join(path_safety_checker, 'stable-diffusion-safety-checker.bin')
-
-
-def download_sam_model(sam_model: str) -> str:
-    match sam_model:
-        case 'vit_b':
-            return downloading_sam_vit_b()
-        case 'vit_l':
-            return downloading_sam_vit_l()
-        case 'vit_h':
-            return downloading_sam_vit_h()
-        case _:
-            raise ValueError(f"sam model {sam_model} does not exist.")
-
-
-def downloading_sam_vit_b():
-    load_file_from_url(
-        url='https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_b_01ec64.pth',
-        model_dir=path_sam,
-        file_name='sam_vit_b_01ec64.pth'
-    )
-    return os.path.join(path_sam, 'sam_vit_b_01ec64.pth')
-
-
-def downloading_sam_vit_l():
-    load_file_from_url(
-        url='https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_l_0b3195.pth',
-        model_dir=path_sam,
-        file_name='sam_vit_l_0b3195.pth'
-    )
-    return os.path.join(path_sam, 'sam_vit_l_0b3195.pth')
-
-
-def downloading_sam_vit_h():
-    load_file_from_url(
-        url='https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_h_4b8939.pth',
-        model_dir=path_sam,
-        file_name='sam_vit_h_4b8939.pth'
-    )
-    return os.path.join(path_sam, 'sam_vit_h_4b8939.pth')
