@@ -372,6 +372,27 @@ class ImageGenerationSeed(BaseModel):
         orm_mode = True
 
 
+class SimpleImageSeed(BaseModel):
+    seed: int = random.randint(MIN_SEED, MAX_SEED)
+    prompt: str = "A funny cat"
+    negative_prompt: str = ""
+    
+    loras: list = lora_ctrls
+    style_selections: list[str] = config.default_styles
+    aspect_ratios_selection: str = config.default_aspect_ratio.replace('×', ' ').split(' ')[:2]
+    
+    image_number: int = 1 # How many images to generate
+    
+    base_model_name: str = config.default_base_model_name
+    sharpness: float = config.default_sample_sharpness # min 0.0 max 30.0
+    cfg_scale: float = config.default_cfg_scale # Aka guidance scale, min 1.0 max 30.0
+    refiner_model_name: str = config.default_refiner_model_name
+    refiner_switch: bool = config.default_refiner_switch
+    
+    disable_seed_increment: bool = False
+    
+
+
 if __name__ == "__main__":
     ...
     
