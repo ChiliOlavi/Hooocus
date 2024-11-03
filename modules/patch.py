@@ -46,7 +46,8 @@ class PatchSettings:
         self.eps_record = None
 
 
-patch_settings = {}
+
+patch_settings: dict[int, PatchSettings] = {}
 
 
 def calculate_weight_patched(self, patches, weight, key):
