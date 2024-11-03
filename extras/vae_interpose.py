@@ -8,7 +8,7 @@ import torch.nn as nn
 
 import ldm_patched.modules.model_management
 from ldm_patched.modules.model_patcher import ModelPatcher
-from modules.config import path_vae_approx
+from utils.config import path_vae_approx
 
 
 class ResBlock(nn.Module):

@@ -1,4 +1,14 @@
+import sys, os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from enum import IntEnum, Enum
+from modules import style_sorter
+from utils import config
+from typing import Literal
+
+from modules.sdxl_styles import legal_style_names
+
 
 
 enhancement_uov_before = "Before First Enhancement"
@@ -98,16 +108,6 @@ sdxl_aspect_ratios = [
 ]
 
 
-class MetadataScheme(Enum):
-    FOOOCUS = 'fooocus'
-    A1111 = 'a1111'
-
-
-metadata_scheme = [
-    (f'{MetadataScheme.FOOOCUS.value} (json)', MetadataScheme.FOOOCUS.value),
-    (f'{MetadataScheme.A1111.value} (plain text)', MetadataScheme.A1111.value),
-]
-
 
 class OutputFormat(Enum):
     PNG = 'png'
@@ -180,3 +180,26 @@ class Performance(Enum):
 
     def lora_filename(self) -> str | None:
         return PerformanceLoRA[self.name].value if self.name in PerformanceLoRA.__members__ else None
+
+
+
+style_sorter.try_load_sorted_styles(legal_style_names, config.default_styles)
+all_styles = style_sorter.all_styles
+all_loras = config.lora_filenames
+performance_lora_keys = PerformanceLoRA.__members__.keys()
+performance_keys = Performance.__members__.keys()
+
+ALLOWED_TABS = Literal['uov', 'inpaint', 'ip', 'desc', 'enhance', 'metadata']
+OUTPAINT_SELECTIONS = Literal['Left', 'Right', 'Top', 'Bottom']
+REFINER_SWAP_METHODS = Literal['joint', 'separate', 'vae']
+CONTROLNET_TASK_TYPES = Literal["ImagePrompt", "FaceSwap", "PyraCanny", "CPDS"]    
+
+UPSCALE_OR_VARIATION_MODES = Literal[
+        'Enabled',
+        'Vary (Subtle)',
+        'Vary (Strong)',
+        'Upscale (1.5x)',
+        'Upscale (2x)',
+        'Upscale (Fast 2x)',
+]
+

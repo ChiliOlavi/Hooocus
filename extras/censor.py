@@ -5,7 +5,7 @@ import torch
 from transformers import CLIPConfig, CLIPImageProcessor
 
 import ldm_patched.modules.model_management as model_management
-import modules.config
+import utils.config
 from extras.safety_checker.models.safety_checker import StableDiffusionSafetyChecker
 from ldm_patched.modules.model_patcher import ModelPatcher
 
@@ -23,7 +23,7 @@ class Censor:
 
     def init(self):
         if self.safety_checker_model is None and self.clip_image_processor is None:
-            safety_checker_model = modules.config.downloading_safety_checker_model()
+            safety_checker_model = utils.config.downloading_safety_checker_model()
             self.clip_image_processor = CLIPImageProcessor.from_json_file(preprocessor_config_path)
             clip_config = CLIPConfig.from_json_file(config_path)
             model = StableDiffusionSafetyChecker.from_pretrained(safety_checker_model, config=clip_config)

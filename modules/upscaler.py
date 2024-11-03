@@ -4,7 +4,7 @@ import modules.core as core
 import torch
 from ldm_patched.contrib.external_upscale_model import ImageUpscaleWithModel
 from ldm_patched.pfn.architecture.RRDB import RRDBNet as ESRGAN
-from modules.config import downloading_upscale_model
+from utils.config import downloading_upscale_model
 
 opImageUpscaleWithModel = ImageUpscaleWithModel()
 model = None

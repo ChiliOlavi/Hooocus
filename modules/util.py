@@ -14,9 +14,9 @@ import hashlib
 
 from PIL import Image
 
-import modules.config
+import utils.config
 import modules.sdxl_styles
-from modules.flags import Performance
+from utils.flags import Performance
 
 LANCZOS = (Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS)
 

@@ -16,7 +16,7 @@ import onnxruntime as ort
 
 from PIL import Image
 from onnxruntime import InferenceSession
-from modules.config import path_clip_vision
+from utils.config import path_clip_vision
 from modules.model_loader import load_file_from_url
 
 

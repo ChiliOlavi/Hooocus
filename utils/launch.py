@@ -2,7 +2,7 @@ import os
 import ssl
 import sys
 import platform
-from modules import config
+from utils import config
 from modules.hash_cache import init_cache, load_cache_from_file
 from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
 from modules.model_loader import load_file_from_url

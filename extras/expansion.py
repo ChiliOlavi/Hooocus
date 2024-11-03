@@ -12,7 +12,7 @@ import ldm_patched.modules.model_management as model_management
 
 from transformers.generation.logits_process import LogitsProcessorList
 from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed
-from modules.config import path_fooocus_expansion
+from utils.config import path_fooocus_expansion
 from ldm_patched.modules.model_patcher import ModelPatcher
 
 

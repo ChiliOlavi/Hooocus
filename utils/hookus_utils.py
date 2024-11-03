@@ -1,4 +1,8 @@
+from ast import List
+from email.mime import image
 import os, sys
+
+from utils import flags
 current_dir = os.path.dirname(os.path.abspath(__file__))
 running_dir = os.path.dirname(current_dir)
 sys.path.append(running_dir)
@@ -6,27 +10,14 @@ sys.path.append(running_dir)
 
 import numpy
 import random
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional
 
-from modules import config, flags
-from modules.sdxl_styles import legal_style_names
+from utils import config
 import modules.style_sorter as style_sorter
-import utils.args_manager as args_manager
+import utils.launch_arguments as launch_arguments
 from utils.consts import MIN_SEED, MAX_SEED
 
-style_sorter.try_load_sorted_styles(legal_style_names, config.default_styles)
-
-all_styles = style_sorter.all_styles
-all_loras = config.lora_filenames
-performance_lora_keys = flags.PerformanceLoRA.__members__.keys()
-performance_keys = flags.Performance.__members__.keys()
-
-ALLOWED_TABS = Literal['uov', 'inpaint', 'ip', 'desc', 'enhance', 'metadata']
-OUTPAINT_SELECTIONS = Literal['Left', 'Right', 'Top', 'Bottom']
-REFINER_SWAP_METHODS = Literal['joint', 'separate', 'vae']
-
-DEFAULT_PERFORMANCE_SELECTION = flags.Performance.HYPER_SD
 
 class LoraTuple(BaseModel):
     enabled: bool = False
@@ -114,6 +105,10 @@ class EnhanceMaskCtrls(BaseModel):
         return v
     
 
+class InpaintImputImage(BaseModel):
+    image: Optional[numpy.ndarray] = Field(description="The image to inpaint")
+    mask: Optional[numpy.ndarray] = Field(description="The mask to inpaint")
+
 
 class ImageGenerationSeed(BaseModel):
 
@@ -136,7 +131,7 @@ class ImageGenerationSeed(BaseModel):
     original_steps: int = -1
     steps: int = -1
     aspect_ratios_selection: str = config.default_aspect_ratio.replace('×', ' ').split(' ')[:2]
-    image_number: int = 1
+    image_number: int = Field(1, description="How many images to generate", ge=1)
     output_format: str = config.default_output_format
     
     seed: int = random.randint(MIN_SEED, MAX_SEED)
@@ -150,8 +145,10 @@ class ImageGenerationSeed(BaseModel):
 
     input_image_checkbox: bool = False
     current_tab: str = config.default_selected_image_input_tab_id
-    uov_method: str = config.default_uov_method
+    
+    uov_method: Optional[UPSCALE_OR_VARIATION_MODES] = None
     uov_input_image: numpy.ndarray = None # TODO: trigger_auto_describe
+    
     outpaint_selections: Optional[OUTPAINT_SELECTIONS | list] = []
     inpaint_input_image: numpy.ndarray = None # TODO: trigger_auto_describe
     inpaint_additional_prompt: str = None
@@ -181,6 +178,9 @@ class ImageGenerationSeed(BaseModel):
 
     callback_steps: int = -1 # Used in async worker...
 
+    should_upscale_or_vary: bool = False
+    should_inpaint: bool = False
+    should_use_imageprompt: bool = False
     
     mixing_image_prompt_and_vary_upscale: bool = False
     mixing_image_prompt_and_inpaint: bool = False
@@ -215,13 +215,12 @@ class ImageGenerationSeed(BaseModel):
     invert_mask_checkbox: bool = False
     inpaint_erode_or_dilate: int = 0 # min -64 max 64
     
-    save_final_enhanced_image_only: bool = bool(args_manager.args.disable_image_log)
+    save_final_enhanced_image_only: bool = bool(launch_arguments.args.disable_image_log)
     save_metadata_to_images: bool = config.default_save_metadata_to_images
     
     args_disable_metadata: bool = True
-    metadata_scheme: str = config.default_metadata_scheme
 
-    cn_tasks: dict = initial_cn_tasks # TODO this will need to be parsed back into an array for the async worker...
+    cn_tasks: Optional[List[ControlNetImageTask]] | None = None
 
     debugging_dino: bool = False
     dino_erode_or_dilate: int = 0 # min -64 max 64

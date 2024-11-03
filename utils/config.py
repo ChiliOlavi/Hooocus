@@ -3,15 +3,16 @@ import json
 import math
 import numbers
 
-import utils.args_manager as args_manager
+import utils.launch_arguments as launch_arguments
 import tempfile
-import modules.flags
+import utils.flags
 import modules.sdxl_styles
 
 from modules.model_loader import load_file_from_url
 from modules.extra_utils import makedirs_with_log, get_files_from_folder, try_eval_env_var
-from modules.flags import OutputFormat, Performance, MetadataScheme
+from utils.flags import OutputFormat, Performance
 
+DEFAULT_PERFORMANCE_SELECTION = Performance.HYPER_SD
 
 def get_config_path(key, default_value):
     env = os.getenv(key)
@@ -27,6 +28,8 @@ config_example_path = get_config_path('config_example_path', "config_modificatio
 config_dict = {}
 always_save_keys = []
 visited_keys = []
+
+
 
 try:
     with open(os.path.abspath(f'./presets/default.json'), "r", encoding="utf-8") as json_file:
@@ -80,7 +83,7 @@ def try_get_preset_content(preset):
     return {}
 
 available_presets = get_presets()
-preset = args_manager.args.preset
+preset = launch_arguments.args.preset
 config_dict.update(try_get_preset_content(preset))
 
 
@@ -175,8 +178,8 @@ def get_config_item_or_set_default(key, default_value, validator, disable_empty_
 
 
 def init_temp_path(path: str | None, default_path: str) -> str:
-    if args_manager.args.temp_path:
-        path = args_manager.args.temp_path
+    if launch_arguments.args.temp_path:
+        path = launch_arguments.args.temp_path
 
     if path != '' and path != default_path:
         try:
@@ -299,18 +302,18 @@ default_sample_sharpness = get_config_item_or_set_default(
 default_sampler = get_config_item_or_set_default(
     key='default_sampler',
     default_value='dpmpp_2m_sde_gpu',
-    validator=lambda x: x in modules.flags.sampler_list,
+    validator=lambda x: x in utils.flags.sampler_list,
     expected_type=str
 )
 default_scheduler = get_config_item_or_set_default(
     key='default_scheduler',
     default_value='karras',
-    validator=lambda x: x in modules.flags.scheduler_list,
+    validator=lambda x: x in utils.flags.scheduler_list,
     expected_type=str
 )
 default_vae = get_config_item_or_set_default(
     key='default_vae',
-    default_value=modules.flags.default_vae,
+    default_value=utils.flags.default_vae,
     validator=lambda x: isinstance(x, str),
     expected_type=str
 )
@@ -418,7 +421,7 @@ vae_downloads = get_config_item_or_set_default(
 )
 available_aspect_ratios = get_config_item_or_set_default(
     key='available_aspect_ratios',
-    default_value=modules.flags.sdxl_aspect_ratios,
+    default_value=utils.flags.sdxl_aspect_ratios,
     validator=lambda x: isinstance(x, list) and all('*' in v for v in x) and len(x) > 1,
     expected_type=list
 )
@@ -431,13 +434,13 @@ default_aspect_ratio = get_config_item_or_set_default(
 default_inpaint_engine_version = get_config_item_or_set_default(
     key='default_inpaint_engine_version',
     default_value='v2.6',
-    validator=lambda x: x in modules.flags.inpaint_engine_versions,
+    validator=lambda x: x in utils.flags.inpaint_engine_versions,
     expected_type=str
 )
 default_selected_image_input_tab_id = get_config_item_or_set_default(
     key='default_selected_image_input_tab_id',
-    default_value=modules.flags.default_input_image_tab,
-    validator=lambda x: x in modules.flags.input_image_tab_ids,
+    default_value=utils.flags.default_input_image_tab,
+    validator=lambda x: x in utils.flags.input_image_tab_ids,
     expected_type=str
 )
 default_uov_method = get_config_item_or_set_default(
@@ -472,12 +475,12 @@ for image_count in range(default_controlnet_image_count):
 
     default_ip_types[image_count] = get_config_item_or_set_default(
         key=f'default_ip_type_{image_count}',
-        default_value=modules.flags.default_ip,
-        validator=lambda x: x in modules.flags.ip_list,
+        default_value=utils.flags.default_ip,
+        validator=lambda x: x in utils.flags.ip_list,
         expected_type=str
     )
 
-    default_end, default_weight = modules.flags.default_parameters[default_ip_types[image_count]]
+    default_end, default_weight = utils.flags.default_parameters[default_ip_types[image_count]]
 
     default_ip_stop_ats[image_count] = get_config_item_or_set_default(
         key=f'default_ip_stop_at_{image_count}',
@@ -500,8 +503,8 @@ default_inpaint_advanced_masking_checkbox = get_config_item_or_set_default(
 )
 default_inpaint_method = get_config_item_or_set_default(
     key='default_inpaint_method',
-    default_value=modules.flags.inpaint_option_default,
-    validator=lambda x: x in modules.flags.inpaint_options,
+    default_value=utils.flags.inpaint_option_default,
+    validator=lambda x: x in utils.flags.inpaint_options,
     expected_type=str
 )
 default_cfg_tsnr = get_config_item_or_set_default(
@@ -513,7 +516,7 @@ default_cfg_tsnr = get_config_item_or_set_default(
 default_clip_skip = get_config_item_or_set_default(
     key='default_clip_skip',
     default_value=2,
-    validator=lambda x: isinstance(x, int) and 1 <= x <= modules.flags.clip_skip_max,
+    validator=lambda x: isinstance(x, int) and 1 <= x <= utils.flags.clip_skip_max,
     expected_type=int
 )
 default_overwrite_step = get_config_item_or_set_default(
@@ -563,14 +566,14 @@ default_enhance_uov_method = get_config_item_or_set_default(
 )
 default_enhance_uov_processing_order = get_config_item_or_set_default(
     key='default_enhance_uov_processing_order',
-    default_value=modules.flags.enhancement_uov_before,
-    validator=lambda x: x in modules.flags.enhancement_uov_processing_order,
+    default_value=utils.flags.enhancement_uov_before,
+    validator=lambda x: x in utils.flags.enhancement_uov_processing_order,
     expected_type=int
 )
 default_enhance_uov_prompt_type = get_config_item_or_set_default(
     key='default_enhance_uov_prompt_type',
-    default_value=modules.flags.enhancement_uov_prompt_type_original,
-    validator=lambda x: x in modules.flags.enhancement_uov_prompt_types,
+    default_value=utils.flags.enhancement_uov_prompt_type_original,
+    validator=lambda x: x in utils.flags.enhancement_uov_prompt_types,
     expected_type=int
 )
 default_sam_max_detections = get_config_item_or_set_default(
@@ -623,28 +626,28 @@ default_invert_mask_checkbox = get_config_item_or_set_default(
 default_inpaint_mask_model = get_config_item_or_set_default(
     key='default_inpaint_mask_model',
     default_value='isnet-general-use',
-    validator=lambda x: x in modules.flags.inpaint_mask_models,
+    validator=lambda x: x in utils.flags.inpaint_mask_models,
     expected_type=str
 )
 
 default_enhance_inpaint_mask_model = get_config_item_or_set_default(
     key='default_enhance_inpaint_mask_model',
     default_value='sam',
-    validator=lambda x: x in modules.flags.inpaint_mask_models,
+    validator=lambda x: x in utils.flags.inpaint_mask_models,
     expected_type=str
 )
 
 default_inpaint_mask_cloth_category = get_config_item_or_set_default(
     key='default_inpaint_mask_cloth_category',
     default_value='full',
-    validator=lambda x: x in modules.flags.inpaint_mask_cloth_category,
+    validator=lambda x: x in utils.flags.inpaint_mask_cloth_category,
     expected_type=str
 )
 
 default_inpaint_mask_sam_model = get_config_item_or_set_default(
     key='default_inpaint_mask_sam_model',
     default_value='vit_b',
-    validator=lambda x: x in modules.flags.inpaint_mask_sam_model,
+    validator=lambda x: x in utils.flags.inpaint_mask_sam_model,
     expected_type=str
 )
 
@@ -656,8 +659,8 @@ default_describe_apply_prompts_checkbox = get_config_item_or_set_default(
 )
 default_describe_content_type = get_config_item_or_set_default(
     key='default_describe_content_type',
-    default_value=[modules.flags.describe_type_photo],
-    validator=lambda x: all(k in modules.flags.describe_types for k in x),
+    default_value=[utils.flags.describe_type_photo],
+    validator=lambda x: all(k in utils.flags.describe_types for k in x),
     expected_type=list
 )
 
@@ -698,8 +701,8 @@ possible_preset_keys = {
 
 REWRITE_PRESET = False
 
-if REWRITE_PRESET and isinstance(args_manager.args.preset, str):
-    save_path = 'presets/' + args_manager.args.preset + '.json'
+if REWRITE_PRESET and isinstance(launch_arguments.args.preset, str):
+    save_path = 'presets/' + launch_arguments.args.preset + '.json'
     with open(save_path, "w", encoding="utf-8") as json_file:
         json.dump({k: config_dict[k] for k in possible_preset_keys}, json_file, indent=4)
     print(f'Preset saved to {save_path}. Exiting ...')
@@ -763,7 +766,7 @@ def update_files():
 
 
 def downloading_inpaint_models(v):
-    assert v in modules.flags.inpaint_engine_versions
+    assert v in utils.flags.inpaint_engine_versions
 
     load_file_from_url(
         url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/fooocus_inpaint_head.pth',
@@ -804,27 +807,27 @@ def downloading_sdxl_lcm_lora():
     load_file_from_url(
         url='https://huggingface.co/lllyasviel/misc/resolve/main/sdxl_lcm_lora.safetensors',
         model_dir=paths_loras[0],
-        file_name=modules.flags.PerformanceLoRA.EXTREME_SPEED.value
+        file_name=utils.flags.PerformanceLoRA.EXTREME_SPEED.value
     )
-    return modules.flags.PerformanceLoRA.EXTREME_SPEED.value
+    return utils.flags.PerformanceLoRA.EXTREME_SPEED.value
 
 
 def downloading_sdxl_lightning_lora():
     load_file_from_url(
         url='https://huggingface.co/mashb1t/misc/resolve/main/sdxl_lightning_4step_lora.safetensors',
         model_dir=paths_loras[0],
-        file_name=modules.flags.PerformanceLoRA.LIGHTNING.value
+        file_name=utils.flags.PerformanceLoRA.LIGHTNING.value
     )
-    return modules.flags.PerformanceLoRA.LIGHTNING.value
+    return utils.flags.PerformanceLoRA.LIGHTNING.value
 
 
 def downloading_sdxl_hyper_sd_lora():
     load_file_from_url(
         url='https://huggingface.co/mashb1t/misc/resolve/main/sdxl_hyper_sd_4step_lora.safetensors',
         model_dir=paths_loras[0],
-        file_name=modules.flags.PerformanceLoRA.HYPER_SD.value
+        file_name=utils.flags.PerformanceLoRA.HYPER_SD.value
     )
-    return modules.flags.PerformanceLoRA.HYPER_SD.value
+    return utils.flags.PerformanceLoRA.HYPER_SD.value
 
 
 def downloading_controlnet_canny():
