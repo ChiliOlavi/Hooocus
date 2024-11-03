@@ -37,7 +37,7 @@ def worker():
     import cv2
     import modules.default_pipeline as pipeline
     import modules.core as core
-    import modules.flags as flags
+    import utils.flags as flags
     import modules.patch
     import ldm_patched.modules.model_management
     import extras.preprocessors as preprocessors
@@ -68,18 +68,18 @@ def worker():
         apply_wildcards,
     )
     from modules.upscaler import perform_upscale
-    from modules.flags import Performance
+    from utils.flags import Performance
     from modules.meta_parser import get_metadata_parser
 
     pid = os.getpid()
     print(f"Started worker with PID {pid}")
 
-    def progressbar(async_task, number, text):
-        print(f"[Fooocus] {text}")
+    def progressbar(async_task: ImageGenerationSeed, number, text):
+        print(f"[Hooocus] {text}")
         async_task.yields.append(["preview", (number, text, None)])
 
     def yield_result(
-        async_task,
+        async_task: ImageGenerationSeed,
         imgs,
         progressbar_index,
         black_out_nsfw,
@@ -89,7 +89,7 @@ def worker():
         if not isinstance(imgs, list):
             imgs = [imgs]
 
-        if censor and (modules.config.default_black_out_nsfw or black_out_nsfw):
+        if censor and (config.default_black_out_nsfw or black_out_nsfw):
             progressbar(async_task, progressbar_index, "Checking for NSFW content ...")
             imgs = default_censor(imgs)
 
@@ -245,7 +245,8 @@ def worker():
 
         return imgs, img_paths, current_progress
 
-    def apply_patch_settings(async_task):
+    def apply_patch_settings(async_task: ImageGenerationSeed):
+
         patch_settings[pid] = PatchSettings(
             async_task.sharpness,
             async_task.adm_scaler_end,
@@ -346,7 +347,7 @@ def worker():
             )
 
     def apply_vary(
-        async_task,
+        async_task: ImageGenerationSeed,
         uov_method,
         denoising_strength,
         uov_input_image,
@@ -881,7 +882,7 @@ def worker():
             current_progress += 1
         progressbar(async_task, 1, "Downloading Lightning components ...")
         async_task.performance_loras += [
-            (modules.config.downloading_sdxl_lightning_lora(), 1.0)
+            (config.downloading_sdxl_lightning_lora(), 1.0)
         ]
         if async_task.refiner_model_name != "None":
             print(f"Refiner disabled in Lightning mode.")
@@ -1020,11 +1021,11 @@ def worker():
                 )
             ):
                 progressbar(async_task, 1, "Downloading upscale models ...")
-                modules.config.downloading_upscale_model()
+                config.downloading_upscale_model()
                 if inpaint_parameterized:
                     progressbar(async_task, 1, "Downloading inpainter ...")
                     inpaint_head_model_path, inpaint_patch_model_path = (
-                        modules.config.downloading_inpaint_models(
+                        config.downloading_inpaint_models(
                             async_task.inpaint_engine
                         )
                     )
@@ -1056,16 +1057,16 @@ def worker():
             goals.append("cn")
             progressbar(async_task, 1, "Downloading control models ...")
             if len(async_task.cn_tasks[flags.cn_canny]) > 0:
-                controlnet_canny_path = modules.config.downloading_controlnet_canny()
+                controlnet_canny_path = config.downloading_controlnet_canny()
             if len(async_task.cn_tasks[flags.cn_cpds]) > 0:
-                controlnet_cpds_path = modules.config.downloading_controlnet_cpds()
+                controlnet_cpds_path = config.downloading_controlnet_cpds()
             if len(async_task.cn_tasks[flags.cn_ip]) > 0:
                 clip_vision_path, ip_negative_path, ip_adapter_path = (
-                    modules.config.downloading_ip_adapters("ip")
+                    config.downloading_ip_adapters("ip")
                 )
             if len(async_task.cn_tasks[flags.cn_ip_face]) > 0:
                 clip_vision_path, ip_negative_path, ip_adapter_face_path = (
-                    modules.config.downloading_ip_adapters("face")
+                    config.downloading_ip_adapters("face")
                 )
         if (
             async_task.current_tab == "enhance"
