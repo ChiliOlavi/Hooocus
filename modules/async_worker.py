@@ -4,189 +4,20 @@ from modules.image_generation_utils import save_and_log
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
+from utils.data_models import ControlNetTask
 import threading
 import utils.config as config
 
 from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_settings, patch_all
-import modules.config
 
 from utils.consts import HOOOCUS_VERSION, MIN_SEED, MAX_SEED
 from utils.hookus_utils import ImageGenerationSeed
 
 patch_all()
 
-
-class AsyncTask:
-    def __init__(self, args):
-        from modules.flags import Performance, MetadataScheme, ip_list, disabled
-        from modules.util import get_enabled_loras
-        from modules.config import default_max_lora_number
-        import utils.launch_arguments as launch_arguments
-
-        self.args = args.copy()
-        self.yields = []
-        self.results = []
-        self.last_stop = False
-        self.processing = False
-
-        self.performance_loras = []
-
-        if len(args) == 0:
-            return
-
-        args.reverse()
-        self.generate_image_grid = args.pop()
-        self.prompt = args.pop()
-        self.negative_prompt = args.pop()
-        self.style_selections = args.pop()
-
-        self.performance_selection = Performance(args.pop())
-        self.steps = self.performance_selection.steps()
-        self.original_steps = self.steps
-
-        self.aspect_ratios_selection = args.pop()
-        self.image_number = args.pop()
-        self.output_format = args.pop()
-        self.seed = int(args.pop())
-        self.read_wildcards_in_order = args.pop()
-        self.sharpness = args.pop()
-        self.cfg_scale = args.pop()
-        self.base_model_name = args.pop()
-        self.refiner_model_name = args.pop()
-        self.refiner_switch = args.pop()
-        self.loras = get_enabled_loras(
-            [
-                (bool(args.pop()), str(args.pop()), float(args.pop()))
-                for _ in range(default_max_lora_number)
-            ]
-        )
-        self.input_image_checkbox = args.pop()
-        self.current_tab = args.pop()
-        self.uov_method = args.pop()
-        self.uov_input_image = args.pop()
-        self.outpaint_selections = args.pop()
-        self.inpaint_input_image = args.pop()
-        self.inpaint_additional_prompt = args.pop()
-        self.inpaint_mask_image_upload = args.pop()
-
-        self.disable_preview = args.pop()
-        self.disable_intermediate_results = args.pop()
-        self.disable_seed_increment = args.pop()
-        self.black_out_nsfw = args.pop()
-        self.adm_scaler_positive = args.pop()
-        self.adm_scaler_negative = args.pop()
-        self.adm_scaler_end = args.pop()
-        self.adaptive_cfg = args.pop()
-        self.clip_skip = args.pop()
-        self.sampler_name = args.pop()
-        self.scheduler_name = args.pop()
-        self.vae_name = args.pop()
-        self.overwrite_step = args.pop()
-        self.overwrite_switch = args.pop()
-        self.overwrite_width = args.pop()
-        self.overwrite_height = args.pop()
-        self.overwrite_vary_strength = args.pop()
-        self.overwrite_upscale_strength = args.pop()
-        self.mixing_image_prompt_and_vary_upscale = args.pop()
-        self.mixing_image_prompt_and_inpaint = args.pop()
-        self.debugging_cn_preprocessor = args.pop()
-        self.skipping_cn_preprocessor = args.pop()
-        self.canny_low_threshold = args.pop()
-        self.canny_high_threshold = args.pop()
-        self.refiner_swap_method = args.pop()
-        self.controlnet_softness = args.pop()
-        self.freeu_enabled = args.pop()
-        self.freeu_b1 = args.pop()
-        self.freeu_b2 = args.pop()
-        self.freeu_s1 = args.pop()
-        self.freeu_s2 = args.pop()
-        self.debugging_inpaint_preprocessor = args.pop()
-        self.inpaint_disable_initial_latent = args.pop()
-        self.inpaint_engine = args.pop()
-        self.inpaint_strength = args.pop()
-        self.inpaint_respective_field = args.pop()
-        self.inpaint_advanced_masking_checkbox = args.pop()
-        self.invert_mask_checkbox = args.pop()
-        self.inpaint_erode_or_dilate = args.pop()
-        self.save_final_enhanced_image_only = (
-            args.pop() if not launch_arguments.args.disable_image_log else False
-        )
-        self.save_metadata_to_images = (
-            args.pop() if not launch_arguments.args.disable_metadata else False
-        )
-        self.metadata_scheme = (
-            MetadataScheme(args.pop())
-            if not launch_arguments.args.disable_metadata
-            else MetadataScheme.FOOOCUS
-        )
-
-        self.cn_tasks = {x: [] for x in ip_list}
-        for _ in range(modules.config.default_controlnet_image_count):
-            cn_img = args.pop()
-            cn_stop = args.pop()
-            cn_weight = args.pop()
-            cn_type = args.pop()
-            if cn_img is not None:
-                self.cn_tasks[cn_type].append([cn_img, cn_stop, cn_weight])
-
-        self.debugging_dino = args.pop()
-        self.dino_erode_or_dilate = args.pop()
-        self.debugging_enhance_masks_checkbox = args.pop()
-
-        self.enhance_input_image = args.pop()
-        self.enhance_checkbox = args.pop()
-        self.enhance_uov_method = args.pop()
-        self.enhance_uov_processing_order = args.pop()
-        self.enhance_uov_prompt_type = args.pop()
-        self.enhance_ctrls = []
-        for _ in range(modules.config.default_enhance_tabs):
-            enhance_enabled = args.pop()
-            enhance_mask_dino_prompt_text = args.pop()
-            enhance_prompt = args.pop()
-            enhance_negative_prompt = args.pop()
-            enhance_mask_model = args.pop()
-            enhance_mask_cloth_category = args.pop()
-            enhance_mask_sam_model = args.pop()
-            enhance_mask_text_threshold = args.pop()
-            enhance_mask_box_threshold = args.pop()
-            enhance_mask_sam_max_detections = args.pop()
-            enhance_inpaint_disable_initial_latent = args.pop()
-            enhance_inpaint_engine = args.pop()
-            enhance_inpaint_strength = args.pop()
-            enhance_inpaint_respective_field = args.pop()
-            enhance_inpaint_erode_or_dilate = args.pop()
-            enhance_mask_invert = args.pop()
-            if enhance_enabled:
-                self.enhance_ctrls.append(
-                    [
-                        enhance_mask_dino_prompt_text,
-                        enhance_prompt,
-                        enhance_negative_prompt,
-                        enhance_mask_model,
-                        enhance_mask_cloth_category,
-                        enhance_mask_sam_model,
-                        enhance_mask_text_threshold,
-                        enhance_mask_box_threshold,
-                        enhance_mask_sam_max_detections,
-                        enhance_inpaint_disable_initial_latent,
-                        enhance_inpaint_engine,
-                        enhance_inpaint_strength,
-                        enhance_inpaint_respective_field,
-                        enhance_inpaint_erode_or_dilate,
-                        enhance_mask_invert,
-                    ]
-                )
-        self.should_enhance = self.enhance_checkbox and (
-            self.enhance_uov_method != disabled.casefold()
-            or len(self.enhance_ctrls) > 0
-        )
-        self.images_to_enhance_count = 0
-        self.enhance_stats = {}
-
-
 async_tasks = []
-
 
 class EarlyReturnException(BaseException):
     pass
@@ -316,7 +147,7 @@ def worker():
 
     def process_task(
         all_steps,
-        async_task,
+        async_task: ImageGenerationSeed,
         callback,
         controlnet_canny_path,
         controlnet_cpds_path,
@@ -1023,7 +854,7 @@ def worker():
 
         return final_scheduler_name
 
-    def set_hyper_sd_defaults(async_task, current_progress, advance_progress=False):
+    def set_hyper_sd_defaults(async_task: ImageGenerationSeed, current_progress, advance_progress=False):
         print("Enter Hyper-SD mode.")
         if advance_progress:
             current_progress += 1
@@ -1045,7 +876,7 @@ def worker():
         async_task.adm_scaler_end = 0.0
         return current_progress
 
-    def set_lightning_defaults(async_task, current_progress, advance_progress=False):
+    def set_lightning_defaults(async_task: ImageGenerationSeed, current_progress, advance_progress=False):
         print("Enter Lightning mode.")
         if advance_progress:
             current_progress += 1
@@ -1090,7 +921,7 @@ def worker():
         return current_progress
 
     def apply_image_input(
-        async_task,
+        async_task: ImageGenerationSeed,
         base_model_additional_loras,
         clip_vision_path,
         controlnet_canny_path,
