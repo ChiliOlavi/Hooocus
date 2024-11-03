@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-class ArgsManager(BaseModel):
+class LaunchArguments(BaseModel):
     share: bool = Field(False, description="Set whether to share on Gradio.")
     preset: str = Field(None, description="Apply specified UI preset.")
     disable_preset_selection: bool = Field(False, description="Disables preset selection in Gradio.")
@@ -16,3 +16,6 @@ class ArgsManager(BaseModel):
     always_download_new_model: bool = Field(False, description="Always download newer models.")
     rebuild_hash_cache: bool = Field(False, description="Generates missing model and LoRA hashes.")
     headless: bool = Field(False, description="Run in headless mode.")
+
+
+args = LaunchArguments()

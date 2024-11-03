@@ -4,7 +4,6 @@ import sys
 import platform
 from modules import config
 from modules.hash_cache import init_cache, load_cache_from_file
-from utils.build_launcher import build_launcher
 from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
 from modules.model_loader import load_file_from_url
 from utils.consts import REINSTALL_ALL, TRY_INSTALL_XFORMERS, HOOOCUS_VERSION
@@ -101,13 +100,8 @@ def prepare_environment():
 
 
 def ini_args():
-    from utils.args_manager import args
+    from utils.launch_arguments import args
     return args
-
-
-#prepare_environment()
-#build_launcher()
-
 
 
 def download_models(default_model, previous_default_models, checkpoint_downloads, embeddings_downloads, lora_downloads, vae_downloads, args):
