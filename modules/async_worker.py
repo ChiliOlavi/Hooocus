@@ -1,4 +1,9 @@
+import os, sys
+
 from modules.image_generation_utils import save_and_log
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import threading
 import utils.config as config
 
