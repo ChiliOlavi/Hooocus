@@ -15,7 +15,7 @@ class AsyncTask:
         from modules.flags import Performance, MetadataScheme, ip_list, disabled
         from modules.util import get_enabled_loras
         from modules.config import default_max_lora_number
-        import utils.args_manager as args_manager
+        import utils.launch_arguments as launch_arguments
 
         self.args = args.copy()
         self.yields = []
