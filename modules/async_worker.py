@@ -213,7 +213,7 @@ def worker():
         current_progress = int(
             base_progress + (100 - preparation_steps) / float(all_steps) * steps
         )
-        if modules.config.default_black_out_nsfw or async_task.black_out_nsfw:
+        if config.default_black_out_nsfw or async_task.black_out_nsfw:
             progressbar(async_task, current_progress, "Checking for NSFW content ...")
             imgs = default_censor(imgs)
         progressbar(
@@ -256,7 +256,7 @@ def worker():
             async_task.adaptive_cfg,
         )
 
-    def save_and_log(
+    def apply_control_nets(
         async_task: ImageGenerationSeed,
         height,
         ip_adapter_face_path,
