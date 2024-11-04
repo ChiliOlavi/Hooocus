@@ -1,4 +1,6 @@
 import os
+import sys
+from typing import Optional
 import torch
 import time
 import math
@@ -19,169 +21,240 @@ import ldm_patched.modules.samplers
 import ldm_patched.modules.args_parser
 import warnings
 import safetensors.torch
-from utils.consts import MAX_SEED
+from utils.config import MAX_SEED
+from utils.config import MAX_SEED
 
 from ldm_patched.modules.samplers import calc_cond_uncond_batch
 from ldm_patched.k_diffusion.sampling import BatchedBrownianTree
 from ldm_patched.ldm.modules.diffusionmodules.openaimodel import forward_timestep_embed, apply_control
 from modules.patch_precision import patch_all_precision
 from modules.patch_clip import patch_all_clip
+from pydantic import BaseModel
 
+class PatchSettings(BaseModel):
+    sharpness: float = 2.0
+    adm_scaler_end: float = 0.3
+    positive_adm_scale: float = 1.5 
+    negative_adm_scale: float = 0.8
+    controlnet_softness: float = 0.25 
+    adaptive_cfg: float = 7.0
+    global_diffusion_progress: float = 0
+    eps_record: Optional[float] = None
 
-class PatchSettings:
-    def __init__(self,
-                 sharpness=2.0,
-                 adm_scaler_end=0.3,
-                 positive_adm_scale=1.5,
-                 negative_adm_scale=0.8,
-                 controlnet_softness=0.25,
-                 adaptive_cfg=7.0):
-        self.sharpness = sharpness
-        self.adm_scaler_end = adm_scaler_end
-        self.positive_adm_scale = positive_adm_scale
-        self.negative_adm_scale = negative_adm_scale
-        self.controlnet_softness = controlnet_softness
-        self.adaptive_cfg = adaptive_cfg
-        self.global_diffusion_progress = 0
-        self.eps_record = None
+class Patch:
+    settings = PatchSettings()
+    patch_settings: dict[int, PatchSettings] = {}
 
+    def __init__(self, **kwargs):
+        self.settings = PatchSettings(**kwargs)
+            
+    def calculate_weight_patched(self, patches, weight, key):
+        for p in patches:
+            alpha = p[0]
+            v = p[1]
+            strength_model = p[2]
 
+            if strength_model != 1.0:
+                weight *= strength_model
 
-patch_settings: dict[int, PatchSettings] = {}
+            if isinstance(v, list):
+                v = (self.calculate_weight(v[1:], v[0].clone(), key),)
 
+            if len(v) == 1:
+                patch_type = "diff"
+            elif len(v) == 2:
+                patch_type = v[0]
+                v = v[1]
 
-def calculate_weight_patched(self, patches, weight, key):
-    for p in patches:
-        alpha = p[0]
-        v = p[1]
-        strength_model = p[2]
+            if patch_type == "diff":
+                w1 = v[0]
+                if alpha != 0.0:
+                    if w1.shape != weight.shape:
+                        print("WARNING SHAPE MISMATCH {} WEIGHT NOT MERGED {} != {}".format(key, w1.shape, weight.shape))
+                    else:
+                        weight += alpha * ldm_patched.modules.model_management.cast_to_device(w1, weight.device, weight.dtype)
+            elif patch_type == "lora":
+                mat1 = ldm_patched.modules.model_management.cast_to_device(v[0], weight.device, torch.float32)
+                mat2 = ldm_patched.modules.model_management.cast_to_device(v[1], weight.device, torch.float32)
+                if v[2] is not None:
+                    alpha *= v[2] / mat2.shape[0]
+                if v[3] is not None:
+                    mat3 = ldm_patched.modules.model_management.cast_to_device(v[3], weight.device, torch.float32)
+                    final_shape = [mat2.shape[1], mat2.shape[0], mat3.shape[2], mat3.shape[3]]
+                    mat2 = torch.mm(mat2.transpose(0, 1).flatten(start_dim=1),
+                                    mat3.transpose(0, 1).flatten(start_dim=1)).reshape(final_shape).transpose(0, 1)
+                try:
+                    weight += (alpha * torch.mm(mat1.flatten(start_dim=1), mat2.flatten(start_dim=1))).reshape(
+                        weight.shape).type(weight.dtype)
+                except Exception as e:
+                    print("ERROR", key, e)
+            elif patch_type == "fooocus":
+                w1 = ldm_patched.modules.model_management.cast_to_device(v[0], weight.device, torch.float32)
+                w_min = ldm_patched.modules.model_management.cast_to_device(v[1], weight.device, torch.float32)
+                w_max = ldm_patched.modules.model_management.cast_to_device(v[2], weight.device, torch.float32)
+                w1 = (w1 / 255.0) * (w_max - w_min) + w_min
+                if alpha != 0.0:
+                    if w1.shape != weight.shape:
+                        print("WARNING SHAPE MISMATCH {} FOOOCUS WEIGHT NOT MERGED {} != {}".format(key, w1.shape, weight.shape))
+                    else:
+                        weight += alpha * ldm_patched.modules.model_management.cast_to_device(w1, weight.device, weight.dtype)
+            elif patch_type == "lokr":
+                w1 = v[0]
+                w2 = v[1]
+                w1_a = v[3]
+                w1_b = v[4]
+                w2_a = v[5]
+                w2_b = v[6]
+                t2 = v[7]
+                dim = None
 
-        if strength_model != 1.0:
-            weight *= strength_model
-
-        if isinstance(v, list):
-            v = (self.calculate_weight(v[1:], v[0].clone(), key),)
-
-        if len(v) == 1:
-            patch_type = "diff"
-        elif len(v) == 2:
-            patch_type = v[0]
-            v = v[1]
-
-        if patch_type == "diff":
-            w1 = v[0]
-            if alpha != 0.0:
-                if w1.shape != weight.shape:
-                    print("WARNING SHAPE MISMATCH {} WEIGHT NOT MERGED {} != {}".format(key, w1.shape, weight.shape))
+                if w1 is None:
+                    dim = w1_b.shape[0]
+                    w1 = torch.mm(ldm_patched.modules.model_management.cast_to_device(w1_a, weight.device, torch.float32),
+                                ldm_patched.modules.model_management.cast_to_device(w1_b, weight.device, torch.float32))
                 else:
-                    weight += alpha * ldm_patched.modules.model_management.cast_to_device(w1, weight.device, weight.dtype)
-        elif patch_type == "lora":
-            mat1 = ldm_patched.modules.model_management.cast_to_device(v[0], weight.device, torch.float32)
-            mat2 = ldm_patched.modules.model_management.cast_to_device(v[1], weight.device, torch.float32)
-            if v[2] is not None:
-                alpha *= v[2] / mat2.shape[0]
-            if v[3] is not None:
-                mat3 = ldm_patched.modules.model_management.cast_to_device(v[3], weight.device, torch.float32)
-                final_shape = [mat2.shape[1], mat2.shape[0], mat3.shape[2], mat3.shape[3]]
-                mat2 = torch.mm(mat2.transpose(0, 1).flatten(start_dim=1),
-                                mat3.transpose(0, 1).flatten(start_dim=1)).reshape(final_shape).transpose(0, 1)
-            try:
-                weight += (alpha * torch.mm(mat1.flatten(start_dim=1), mat2.flatten(start_dim=1))).reshape(
-                    weight.shape).type(weight.dtype)
-            except Exception as e:
-                print("ERROR", key, e)
-        elif patch_type == "fooocus":
-            w1 = ldm_patched.modules.model_management.cast_to_device(v[0], weight.device, torch.float32)
-            w_min = ldm_patched.modules.model_management.cast_to_device(v[1], weight.device, torch.float32)
-            w_max = ldm_patched.modules.model_management.cast_to_device(v[2], weight.device, torch.float32)
-            w1 = (w1 / 255.0) * (w_max - w_min) + w_min
-            if alpha != 0.0:
-                if w1.shape != weight.shape:
-                    print("WARNING SHAPE MISMATCH {} FOOOCUS WEIGHT NOT MERGED {} != {}".format(key, w1.shape, weight.shape))
+                    w1 = ldm_patched.modules.model_management.cast_to_device(w1, weight.device, torch.float32)
+
+                if w2 is None:
+                    dim = w2_b.shape[0]
+                    if t2 is None:
+                        w2 = torch.mm(ldm_patched.modules.model_management.cast_to_device(w2_a, weight.device, torch.float32),
+                                    ldm_patched.modules.model_management.cast_to_device(w2_b, weight.device, torch.float32))
+                    else:
+                        w2 = torch.einsum('i j k l, j r, i p -> p r k l',
+                                        ldm_patched.modules.model_management.cast_to_device(t2, weight.device, torch.float32),
+                                        ldm_patched.modules.model_management.cast_to_device(w2_b, weight.device, torch.float32),
+                                        ldm_patched.modules.model_management.cast_to_device(w2_a, weight.device, torch.float32))
                 else:
-                    weight += alpha * ldm_patched.modules.model_management.cast_to_device(w1, weight.device, weight.dtype)
-        elif patch_type == "lokr":
-            w1 = v[0]
-            w2 = v[1]
-            w1_a = v[3]
-            w1_b = v[4]
-            w2_a = v[5]
-            w2_b = v[6]
-            t2 = v[7]
-            dim = None
+                    w2 = ldm_patched.modules.model_management.cast_to_device(w2, weight.device, torch.float32)
 
-            if w1 is None:
-                dim = w1_b.shape[0]
-                w1 = torch.mm(ldm_patched.modules.model_management.cast_to_device(w1_a, weight.device, torch.float32),
-                              ldm_patched.modules.model_management.cast_to_device(w1_b, weight.device, torch.float32))
-            else:
-                w1 = ldm_patched.modules.model_management.cast_to_device(w1, weight.device, torch.float32)
+                if len(w2.shape) == 4:
+                    w1 = w1.unsqueeze(2).unsqueeze(2)
+                if v[2] is not None and dim is not None:
+                    alpha *= v[2] / dim
 
-            if w2 is None:
-                dim = w2_b.shape[0]
-                if t2 is None:
-                    w2 = torch.mm(ldm_patched.modules.model_management.cast_to_device(w2_a, weight.device, torch.float32),
-                                  ldm_patched.modules.model_management.cast_to_device(w2_b, weight.device, torch.float32))
+                try:
+                    weight += alpha * torch.kron(w1, w2).reshape(weight.shape).type(weight.dtype)
+                except Exception as e:
+                    print("ERROR", key, e)
+            elif patch_type == "loha":
+                w1a = v[0]
+                w1b = v[1]
+                if v[2] is not None:
+                    alpha *= v[2] / w1b.shape[0]
+                w2a = v[3]
+                w2b = v[4]
+                if v[5] is not None:  # cp decomposition
+                    t1 = v[5]
+                    t2 = v[6]
+                    m1 = torch.einsum('i j k l, j r, i p -> p r k l',
+                                    ldm_patched.modules.model_management.cast_to_device(t1, weight.device, torch.float32),
+                                    ldm_patched.modules.model_management.cast_to_device(w1b, weight.device, torch.float32),
+                                    ldm_patched.modules.model_management.cast_to_device(w1a, weight.device, torch.float32))
+
+                    m2 = torch.einsum('i j k l, j r, i p -> p r k l',
+                                    ldm_patched.modules.model_management.cast_to_device(t2, weight.device, torch.float32),
+                                    ldm_patched.modules.model_management.cast_to_device(w2b, weight.device, torch.float32),
+                                    ldm_patched.modules.model_management.cast_to_device(w2a, weight.device, torch.float32))
                 else:
-                    w2 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                      ldm_patched.modules.model_management.cast_to_device(t2, weight.device, torch.float32),
-                                      ldm_patched.modules.model_management.cast_to_device(w2_b, weight.device, torch.float32),
-                                      ldm_patched.modules.model_management.cast_to_device(w2_a, weight.device, torch.float32))
+                    m1 = torch.mm(ldm_patched.modules.model_management.cast_to_device(w1a, weight.device, torch.float32),
+                                ldm_patched.modules.model_management.cast_to_device(w1b, weight.device, torch.float32))
+                    m2 = torch.mm(ldm_patched.modules.model_management.cast_to_device(w2a, weight.device, torch.float32),
+                                ldm_patched.modules.model_management.cast_to_device(w2b, weight.device, torch.float32))
+
+                try:
+                    weight += (alpha * m1 * m2).reshape(weight.shape).type(weight.dtype)
+                except Exception as e:
+                    print("ERROR", key, e)
+            elif patch_type == "glora":
+                if v[4] is not None:
+                    alpha *= v[4] / v[0].shape[0]
+
+                a1 = ldm_patched.modules.model_management.cast_to_device(v[0].flatten(start_dim=1), weight.device, torch.float32)
+                a2 = ldm_patched.modules.model_management.cast_to_device(v[1].flatten(start_dim=1), weight.device, torch.float32)
+                b1 = ldm_patched.modules.model_management.cast_to_device(v[2].flatten(start_dim=1), weight.device, torch.float32)
+                b2 = ldm_patched.modules.model_management.cast_to_device(v[3].flatten(start_dim=1), weight.device, torch.float32)
+
+                weight += ((torch.mm(b2, b1) + torch.mm(torch.mm(weight.flatten(start_dim=1), a2), a1)) * alpha).reshape(weight.shape).type(weight.dtype)
             else:
-                w2 = ldm_patched.modules.model_management.cast_to_device(w2, weight.device, torch.float32)
+                print("patch type not recognized", patch_type, key)
 
-            if len(w2.shape) == 4:
-                w1 = w1.unsqueeze(2).unsqueeze(2)
-            if v[2] is not None and dim is not None:
-                alpha *= v[2] / dim
+        return weight
 
-            try:
-                weight += alpha * torch.kron(w1, w2).reshape(weight.shape).type(weight.dtype)
-            except Exception as e:
-                print("ERROR", key, e)
-        elif patch_type == "loha":
-            w1a = v[0]
-            w1b = v[1]
-            if v[2] is not None:
-                alpha *= v[2] / w1b.shape[0]
-            w2a = v[3]
-            w2b = v[4]
-            if v[5] is not None:  # cp decomposition
-                t1 = v[5]
-                t2 = v[6]
-                m1 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                  ldm_patched.modules.model_management.cast_to_device(t1, weight.device, torch.float32),
-                                  ldm_patched.modules.model_management.cast_to_device(w1b, weight.device, torch.float32),
-                                  ldm_patched.modules.model_management.cast_to_device(w1a, weight.device, torch.float32))
+    def compute_cfg(self, uncond, cond, cfg_scale, t):
+        pid = os.getpid()
+        mimic_cfg = float(self.patch_settings[pid].adaptive_cfg)
+        real_cfg = float(cfg_scale)
 
-                m2 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                  ldm_patched.modules.model_management.cast_to_device(t2, weight.device, torch.float32),
-                                  ldm_patched.modules.model_management.cast_to_device(w2b, weight.device, torch.float32),
-                                  ldm_patched.modules.model_management.cast_to_device(w2a, weight.device, torch.float32))
-            else:
-                m1 = torch.mm(ldm_patched.modules.model_management.cast_to_device(w1a, weight.device, torch.float32),
-                              ldm_patched.modules.model_management.cast_to_device(w1b, weight.device, torch.float32))
-                m2 = torch.mm(ldm_patched.modules.model_management.cast_to_device(w2a, weight.device, torch.float32),
-                              ldm_patched.modules.model_management.cast_to_device(w2b, weight.device, torch.float32))
+        real_eps = uncond + real_cfg * (cond - uncond)
 
-            try:
-                weight += (alpha * m1 * m2).reshape(weight.shape).type(weight.dtype)
-            except Exception as e:
-                print("ERROR", key, e)
-        elif patch_type == "glora":
-            if v[4] is not None:
-                alpha *= v[4] / v[0].shape[0]
-
-            a1 = ldm_patched.modules.model_management.cast_to_device(v[0].flatten(start_dim=1), weight.device, torch.float32)
-            a2 = ldm_patched.modules.model_management.cast_to_device(v[1].flatten(start_dim=1), weight.device, torch.float32)
-            b1 = ldm_patched.modules.model_management.cast_to_device(v[2].flatten(start_dim=1), weight.device, torch.float32)
-            b2 = ldm_patched.modules.model_management.cast_to_device(v[3].flatten(start_dim=1), weight.device, torch.float32)
-
-            weight += ((torch.mm(b2, b1) + torch.mm(torch.mm(weight.flatten(start_dim=1), a2), a1)) * alpha).reshape(weight.shape).type(weight.dtype)
+        if cfg_scale > self.patch_settings[pid].adaptive_cfg:
+            mimicked_eps = uncond + mimic_cfg * (cond - uncond)
+            return real_eps * t + mimicked_eps * (1 - t)
         else:
-            print("patch type not recognized", patch_type, key)
+            return real_eps
 
-    return weight
+    def patched_sampling_function(self, model, x, timestep, uncond, cond, cond_scale, model_options=None, seed=None):
+        pid = os.getpid()
+
+        if math.isclose(cond_scale, 1.0) and not model_options.get("disable_cfg1_optimization", False):
+            final_x0 = calc_cond_uncond_batch(model, cond, None, x, timestep, model_options)[0]
+
+            if self.patch_settings[pid].eps_record is not None:
+                self.patch_settings[pid].eps_record = ((x - final_x0) / timestep).cpu()
+
+            return final_x0
+
+        positive_x0, negative_x0 = calc_cond_uncond_batch(model, cond, uncond, x, timestep, model_options)
+
+        positive_eps = x - positive_x0
+        negative_eps = x - negative_x0
+
+        alpha = 0.001 * self.patch_settings[pid].sharpness * self.patch_settings[pid].global_diffusion_progress
+
+        positive_eps_degraded = anisotropic.adaptive_anisotropic_filter(x=positive_eps, g=positive_x0)
+        positive_eps_degraded_weighted = positive_eps_degraded * alpha + positive_eps * (1.0 - alpha)
+
+        final_eps = self.compute_cfg(uncond=negative_eps, cond=positive_eps_degraded_weighted,
+                                cfg_scale=cond_scale, t=self.patch_settings[pid].global_diffusion_progress)
+
+        if self.patch_settings[pid].eps_record is not None:
+            self.patch_settings[pid].eps_record = (final_eps / timestep).cpu()
+
+        return x - final_eps
+
+    # TODO Check if patch works in another context
+    def sdxl_encode_adm_patched(self, **kwargs):
+        clip_pooled = ldm_patched.modules.model_base.sdxl_pooled(kwargs, self.noise_augmentor)
+        width = kwargs.get("width", 1024)
+        height = kwargs.get("height", 1024)
+        target_width = width
+        target_height = height
+        pid = os.getpid()
+
+        if kwargs.get("prompt_type", "") == "negative":
+            width = float(width) * self.patch_settings[pid].negative_adm_scale
+            height = float(height) * self.patch_settings[pid].negative_adm_scale
+        elif kwargs.get("prompt_type", "") == "positive":
+            width = float(width) * patch_settings[pid].positive_adm_scale
+            height = float(height) * patch_settings[pid].positive_adm_scale
+
+        def embedder(number_list):
+            h = self.embedder(torch.tensor(number_list, dtype=torch.float32))
+            h = torch.flatten(h).unsqueeze(dim=0).repeat(clip_pooled.shape[0], 1)
+            return h
+
+        width, height = int(width), int(height)
+        target_width, target_height = round_to_64(target_width), round_to_64(target_height)
+
+        adm_emphasized = embedder([height, width, 0, 0, target_height, target_width])
+        adm_consistent = embedder([target_height, target_width, 0, 0, target_height, target_width])
+
+        clip_pooled = clip_pooled.to(adm_emphasized)
+        final_adm = torch.cat((clip_pooled, adm_emphasized, clip_pooled, adm_consistent), dim=1)
+
+        return final_adm
+
 
 
 class BrownianTreeNoiseSamplerPatched:
@@ -209,90 +282,13 @@ class BrownianTreeNoiseSamplerPatched:
         t0, t1 = transform(torch.as_tensor(sigma)), transform(torch.as_tensor(sigma_next))
         return tree(t0, t1) / (t1 - t0).abs().sqrt()
 
-
-def compute_cfg(uncond, cond, cfg_scale, t):
-    pid = os.getpid()
-    mimic_cfg = float(patch_settings[pid].adaptive_cfg)
-    real_cfg = float(cfg_scale)
-
-    real_eps = uncond + real_cfg * (cond - uncond)
-
-    if cfg_scale > patch_settings[pid].adaptive_cfg:
-        mimicked_eps = uncond + mimic_cfg * (cond - uncond)
-        return real_eps * t + mimicked_eps * (1 - t)
-    else:
-        return real_eps
-
-
-def patched_sampling_function(model, x, timestep, uncond, cond, cond_scale, model_options=None, seed=None):
-    pid = os.getpid()
-
-    if math.isclose(cond_scale, 1.0) and not model_options.get("disable_cfg1_optimization", False):
-        final_x0 = calc_cond_uncond_batch(model, cond, None, x, timestep, model_options)[0]
-
-        if patch_settings[pid].eps_record is not None:
-            patch_settings[pid].eps_record = ((x - final_x0) / timestep).cpu()
-
-        return final_x0
-
-    positive_x0, negative_x0 = calc_cond_uncond_batch(model, cond, uncond, x, timestep, model_options)
-
-    positive_eps = x - positive_x0
-    negative_eps = x - negative_x0
-
-    alpha = 0.001 * patch_settings[pid].sharpness * patch_settings[pid].global_diffusion_progress
-
-    positive_eps_degraded = anisotropic.adaptive_anisotropic_filter(x=positive_eps, g=positive_x0)
-    positive_eps_degraded_weighted = positive_eps_degraded * alpha + positive_eps * (1.0 - alpha)
-
-    final_eps = compute_cfg(uncond=negative_eps, cond=positive_eps_degraded_weighted,
-                            cfg_scale=cond_scale, t=patch_settings[pid].global_diffusion_progress)
-
-    if patch_settings[pid].eps_record is not None:
-        patch_settings[pid].eps_record = (final_eps / timestep).cpu()
-
-    return x - final_eps
-
-
-def round_to_64(x):
+def round_to_64(x: float) -> int:
     h = float(x)
     h = h / 64.0
     h = round(h)
     h = int(h)
     h = h * 64
     return h
-
-
-def sdxl_encode_adm_patched(self, **kwargs):
-    clip_pooled = ldm_patched.modules.model_base.sdxl_pooled(kwargs, self.noise_augmentor)
-    width = kwargs.get("width", 1024)
-    height = kwargs.get("height", 1024)
-    target_width = width
-    target_height = height
-    pid = os.getpid()
-
-    if kwargs.get("prompt_type", "") == "negative":
-        width = float(width) * patch_settings[pid].negative_adm_scale
-        height = float(height) * patch_settings[pid].negative_adm_scale
-    elif kwargs.get("prompt_type", "") == "positive":
-        width = float(width) * patch_settings[pid].positive_adm_scale
-        height = float(height) * patch_settings[pid].positive_adm_scale
-
-    def embedder(number_list):
-        h = self.embedder(torch.tensor(number_list, dtype=torch.float32))
-        h = torch.flatten(h).unsqueeze(dim=0).repeat(clip_pooled.shape[0], 1)
-        return h
-
-    width, height = int(width), int(height)
-    target_width, target_height = round_to_64(target_width), round_to_64(target_height)
-
-    adm_emphasized = embedder([height, width, 0, 0, target_height, target_width])
-    adm_consistent = embedder([target_height, target_width, 0, 0, target_height, target_width])
-
-    clip_pooled = clip_pooled.to(adm_emphasized)
-    final_adm = torch.cat((clip_pooled, adm_emphasized, clip_pooled, adm_consistent), dim=1)
-
-    return final_adm
 
 
 def patched_KSamplerX0Inpaint_forward(self, x, sigma, uncond, cond, cond_scale, denoise_mask, model_options={}, seed=None):
