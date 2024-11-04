@@ -7,7 +7,7 @@ from utils.model_download_util import downloading_controlnet_canny
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils.consts import HOOOCUS_VERSION, METADATA_SCHEME
-from utils.hookus_utils import ImageGenerationSeed
+from utils.hooocus_utils import ImageGenerationSeed
 from modules import patch, meta_parser
 from modules.private_logger import log
 import math

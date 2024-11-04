@@ -20,7 +20,7 @@ from modules.private_logger import get_current_html_path
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
 from utils.consts import HOOOCUS_VERSION, AUTH_FILENAME, MIN_SEED, MAX_SEED
-from utils.hookus_utils import ImageGenerationSeed
+from utils.hooocus_utils import ImageGenerationSeed
 
 def get_task(*args):
     args = list(args)

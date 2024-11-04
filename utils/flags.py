@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from modules.extra_utils import get_files_from_folder
 from modules.model_loader import load_file_from_url
-from utils.hookus_utils import LoraTuple
+from utils.hooocus_utils import LoraTuple
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
