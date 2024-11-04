@@ -14,9 +14,10 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional
 
 from utils import config
-import modules.style_sorter as style_sorter
-import utils.launch_arguments as launch_arguments
+from utils.flags import CONTROLNET_TASK_TYPES
+from utils.config import DEFAULT_CONFIG, DEFAULT_LAUNCH_ARGUMENTS
 
+import modules.style_sorter as style_sorter
 
 
 class LoraTuple(BaseModel):
@@ -26,7 +27,7 @@ class LoraTuple(BaseModel):
 
     @field_validator("weight", mode="after")
     def validate_lora_weight(cls, v):
-        if v < config.default_loras_min_weight or v > config.default_loras_max_weight:
+        if v < DEFAULT_CONFIG.default_loras_min_weight or v > DEFAULT_CONFIG.default_loras_max_weight:
             raise ValueError(f"Invalid lora_weight value: {v}")
         return v
     
@@ -108,6 +109,7 @@ class ImageGenerationSeed(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+        orm_mode = True
 
     path_outputs: str = "./outputs"
     yields: list = []
@@ -124,7 +126,9 @@ class ImageGenerationSeed(BaseModel):
     performance_loras: list = []
     original_steps: int = -1
     steps: int = -1
-    aspect_ratios_selection: str = config.default_aspect_ratio.replace('×', ' ').split(' ')[:2]
+    
+
+    aspect_ratios_selection: str = Field(flags)
     image_number: int = Field(1, description="How many images to generate", ge=1)
     output_format: flags.LITERAL_OUTPUT_FORMATS = Field("png", description="Output format")
     
@@ -229,174 +233,13 @@ class ImageGenerationSeed(BaseModel):
 
     enhance_uov_prompt_type: str = config.default_enhance_uov_prompt_type
     enhance_ctrls: Optional[list[EnhanceMaskCtrls]] = []
-    should_enchance: bool = False
-    @field_validator("should_enchance", mode="after")
-    def validate_should_enchance(cls, v):
-        if cls.enhance_checkbox and (cls.enhance_uov_method or len(cls.enhance_ctrls) > 0):
-            return True
-        return False
-    
-
-
-    @field_validator("output_format")
-    def validate_output_format(cls, v):
-        if v not in flags.output_formats:
-            raise ValueError(f"Invalid output format: {v}")
-        return v
-    
-    @field_validator("aspect_ratios_selection")
-    def validate_aspect_ratios_selection(cls, v):
-        if v not in config.available_aspect_ratios:
-            raise ValueError(f"Invalid aspect ratio selection: {v}")
-        return v
-    
-    @field_validator("performance_selection", mode="after")
-    def validate_performance_selection(cls, v):
-        if v not in flags.Performance.values():
-            raise ValueError(f"Invalid performance selection: {v}")
-        return v
-    
-    @field_validator("seed", mode="after")
-    def validate_seed(cls, v):
-        if v < config.MIN_SEED or v > config.MAX_SEED:
-            raise ValueError(f"Invalid seed value: {v}")
-        return v
-    
-    @field_validator("style_selections")
-    def validate_style_selections(cls, v):
-        for style in v:
-            if style not in flags.all_styles:
-                raise ValueError(f"Invalid style selection: {style}")
-        return v
-    
-    @field_validator("sharpness", mode="after")
-    def validate_sharpness(cls, v):
-        if v < 0.0 or v > 30.0:
-            raise ValueError(f"Invalid sharpness value: {v}. The value must be between 0.0 and 30.0")
-        return v
-    
-    @field_validator("cfg_scale", mode="after")
-    def validate_cfg_scale(cls, v):
-        if v < 1.0 or v > 30.0:
-            raise ValueError(f"Invalid cfg_scale value: {v}. The value must be between 1.0 and 30.0")
-        return v
-    
-    @field_validator("refiner_switch", mode="after")
-    def validate_refiner_switch(cls, v):
-        if v < 0.1 or v > 1.0:
-            raise ValueError(f"Invalid refiner_switch value: {v}. The value must be either 0 or 1")
-        
-    @field_validator("sampler_name")
-    def validate_sampler_name(cls, v):
-        if v not in flags.sampler_list:
-            raise ValueError(f"Invalid sampler name: {v}")
-        return v
-    
-    @field_validator("scheduler_name")
-    def validate_scheduler_name(cls, v):
-        if v not in flags.scheduler_list:
-            raise ValueError(f"Invalid scheduler name: {v}")
-        return v
-
-    @field_validator("overwrite_step")
-    def validate_overwrite_step(cls, v):
-        # -1 to disable
-        if v < -1 or v > 200:
-            raise ValueError(f"Invalid overwrite step: {v}")
-        return v
-    
-    @field_validator("overwrite_vary_strength")
-    def validate_overwrite_vary_strength(cls, v):
-        # -1 to disable
-        if v < -1 or v > 1.0:
-            raise ValueError(f"Invalid overwrite vary strength: {v}")
-        return v
-    
-    @field_validator("vae_name")
-    def validate_vae_name(cls, v):
-        if v not in flags.default_vae + config.vae_filenames:
-            raise ValueError(f"Invalid vae name: {v}")
-        return v
-    
-    @field_validator("overwrite_height")
-    def validate_overwrite_height(cls, v):
-        # -1 to disable
-        if v < -1 or v > 2048:
-            raise ValueError(f"Invalid overwrite height: {v}")
-        return v
-
-    @field_validator("overwrite_width")
-    def validate_overwrite_width(cls, v):
-        # -1 to disable
-        if v < -1 or v > 2048:
-            raise ValueError(f"Invalid overwrite width: {v}")
-        return v
-
-    @field_validator("overwrite_upscale_strength")
-    def validate_overwrite_upscale_strength(cls, v):
-        # -1 to disable
-        if v < -1 or v > 1.0:
-            raise ValueError(f"Invalid overwrite upscale strength: {v}")
-        return v
-    
-    @field_validator("overwrite_switch")
-    def validate_overwrite_switch(cls, v):
-        # -1 to disable
-        if v < -1 or v > 200:
-            raise ValueError(f"Invalid overwrite switch: {v}")
-        
-    @field_validator("enhance_uov_method", mode="after")
-    def validate_enhance_uov_method(cls, v):
-        if v not in flags.uov_list:
-            raise ValueError(f"Invalid enhance uov method: {v}")
-        return v
-    
-    @field_validator("enhance_uov_processing_order", mode="after")
-    def validate_enhance_uov_processing_order(cls, v):
-        if v not in config.default_enhance_uov_processing_order:
-            raise ValueError(f"Invalid enhance uov processing order: {v}")
-        return v
-    
-    @field_validator("enhance_uov_prompt_type", mode="after")
-    def validate_enhance_uov_prompt_type(cls, v):
-        if v not in flags.enhancement_uov_prompt_types:
-            raise ValueError(f"Invalid enhance uov prompt type: {v}")
-        return v
-
+    should_enhance: bool = False
     def __init__(self, **data):
         super().__init__(**data)
         perf_name = flags.Performance(self.performance_selection).name
         self.steps = self.steps if self.steps != -1 else flags.Steps[perf_name].value
         self.original_steps = self.original_steps if self.original_steps != -1 else self.steps
 
-    class Config:
-        arbitrary_types_allowed = True
-        orm_mode = True
 
-
-class SimpleImageSeed(BaseModel):
-    seed: int = random.randint(config.MIN_SEED, config.MAX_SEED)
-    prompt: str = "A funny cat"
-    negative_prompt: str = ""
-    
-    loras: list = lora_ctrls
-    style_selections: list[str] = config.default_styles
-    aspect_ratios_selection: str = config.default_aspect_ratio.replace('×', ' ').split(' ')[:2]
-    
-    image_number: int = 1 # How many images to generate
-    
-    base_model_name: str = config.default_base_model_name
-    sharpness: float = config.default_sample_sharpness # min 0.0 max 30.0
-    cfg_scale: float = config.default_cfg_scale # Aka guidance scale, min 1.0 max 30.0
-    refiner_model_name: str = config.default_refiner_model_name
-    refiner_switch: bool = config.default_refiner_switch
-    
-    disable_seed_increment: bool = False
-    
-
-
-if __name__ == "__main__":
-    ...
-    
 
 
