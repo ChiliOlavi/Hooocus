@@ -1,35 +1,73 @@
 import os
+import sys
+
+PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(PARENT_DIR)
+
 import json
+import tempfile
 from typing import List, Optional, Union
+from enum import Enum
 
 from pydantic import BaseModel, field_validator
-
-from utils.consts import CONFIG_PATH, PARENT_DIR
-from utils.hookus_utils import LoraTuple
-import tempfile
-import utils.flags
-
-from modules.model_loader import load_file_from_url
-from modules.extra_utils import makedirs_with_log, get_files_from_folder, try_eval_env_var
-from utils.flags import Performance
-from utils.logging_util import LoggingUtil
 from pydantic import BaseModel, Field
+
+from utils.hooocus_utils import LoraTuple
+from utils.logging_util import LoggingUtil
+from utils.flags import Performance
 
 log = LoggingUtil().get_logger()
 
+class FilePathConfig(Enum):
+    config_path = 'utils/config.json'
+    hash_cache_path = f'{PARENT_DIR}/__cache__/hash_cache.json'
+    auth_filename = 'auth.json'
 
-METADATA_SCHEME = "Hooocus"
-PRESET_CHOSEN = "Realistic"
+class PathsConfig(Enum):
+    path_checkpoints = "./models/checkpoints/"
+    path_loras = "./models/loras/"
+    path_embeddings = "./models/embeddings/"
+    path_vae_approx = "./models/vae_approx/"
+    path_vae = "./models/vae/"
+    path_upscale_models = "./models/upscale_models/"
+    path_inpaint = "./models/inpaint/"
+    path_controlnet = "./models/controlnet/"
+    path_clip_vision = "./models/clip_vision/"
+    path_fooocus_expansion = "./models/prompt_expansion/fooocus_expansion"
+    path_wildcards = "./wildcards/"
+    path_safety_checker = "./models/safety_checker/"
+    path_sam = "./models/sam/"
+    default_temp_path = os.path.join(tempfile.gettempdir(), 'hooocus')
 
-try:
-    with open(f"{PARENT_DIR}/presets/{PRESET_CHOSEN.lower()}.json") as f:
-        PRESET = json.load(f)
-except FileNotFoundError:
-    log.error(f"Could not find preset file for {PRESET_CHOSEN}")
-    PRESET = {}
+    def __init__(self, **data):
+        super().__init__(**data)
+        for _key, value in data.items():
+            if ".json" in value:
+                pass
+            if not os.path.exists(value):
+                log.error(f"Path does not exist for: {value}. Creating it.")
+                os.makedirs(value)
+
+
+class GlobalEnv(Enum):
+    PYTHONFAULTHANDLER=1
+    HOOOCUS_VERSION = '0.5.0'
+
+    # launch.py
+    REINSTALL_ALL = False
+    TRY_INSTALL_XFORMERS = False
+
+    # From launch.py
+    PYTORCH_ENABLE_MPS_FALLBACK = 1
+    PYTORCH_MPS_HIGH_WATERMARK_RATIO = 0.0
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        for _key, value in data.items():
+            os.environ[_key] = str(value)
+
 
 class LaunchArguments(BaseModel):
-    preset: str = Field(None, description="Apply specified UI preset.")
     disable_offload_from_vram: bool = Field(False, description="Force loading models to vram when the unload can be avoided.")
     disable_image_log: bool = Field(False, description="Prevent writing images and logs to the outputs folder.")
     disable_analytics: bool = Field(False, description="Disables analytics for Gradio.")
@@ -40,42 +78,50 @@ class LaunchArguments(BaseModel):
     always_download_new_model: bool = Field(False, description="Always download newer models.")
     rebuild_hash_cache: bool = Field(False, description="Generates missing model and LoRA hashes.")
 
-# Put your args here
-DEFAULT_LAUNCH_ARGUMENTS = LaunchArguments()
+    min_seed: int = 0
+    max_seed: int = 2**63 - 1
 
-DEFAULT_PERFORMANCE_SELECTION = Performance.HYPER_SD
+    metadata_scheme: str = "Hooocus"
+    preset_chosen: str = "Realistic"
+    current_preset = {}
+    performance_selection = Performance.SPEED
 
-# K-sampling
-MIN_SEED = 0
-MAX_SEED = 2**63 - 1
+    def __init__(self, **data):
+        try:
+            with open(f"{PARENT_DIR}/presets/{self.preset_chosen.lower()}.json") as f:
+                self.current_preset = json.load(f)
+        except FileNotFoundError:
+            log.error(f"Could not find preset file for {self.preset_chosen}.")
+            self.current_preset = {}
+        
+        super().__init__(**data) # Call the parent class constructor
 
-wildcards_max_bfs_depth = 64
+LAUNCH_ARGUMENTS = LaunchArguments()
 
-class HookusConfig(BaseModel):
-    default_model: str = Field(PRESET["default_model"], description="The default model to use.")
-    default_refiner: str = Field(PRESET["default_refiner"], description="The default refiner model to use.")
-    default_refiner_switch: int = Field(PRESET["default_refiner_switch"], description="The default refiner switch to use.")
-    default_loras: List[LoraTuple] = Field(PRESET["default_loras"], description="The default LoRAs to use.")
+class HocusConfig(BaseModel):
+    default_model: str = Field(LAUNCH_ARGUMENTS.current_preset["default_model"], description="The default model to use.")
+    default_refiner: str = Field(LAUNCH_ARGUMENTS.current_preset["default_refiner"], description="The default refiner model to use.")
+    default_refiner_switch: int = Field(LAUNCH_ARGUMENTS.current_preset["default_refiner_switch"], description="The default refiner switch to use.")
+    default_loras: List[LoraTuple] = Field(LAUNCH_ARGUMENTS.current_preset["default_loras"], description="The default LoRAs to use.")
+    
     @field_validator("default_loras", mode="before")
     def validate_default_loras(cls, v):
-        if not isinstance(v, list):
-            raise ValueError("default_loras must be a list.")
         loras_to_add = [LoraTuple(**lora) for lora in v]
         return loras_to_add
 
-    default_cfg_scale: float = Field(PRESET["default_cfg_scale"], description="The default cfg scale to use.")
-    default_sample_sharpness: float = Field(PRESET["default_sample_sharpness"], description="The default sample sharpness to use.")
-    default_sampler: str = Field(PRESET["default_sampler"], description="The default sampler to use.")
-    default_scheduler: str = Field(PRESET["default_scheduler"], description="The default scheduler to use.")
-    default_performance: str = Field(PRESET["default_performance"], description="The default performance to use.")
-    default_prompt: str = Field(PRESET["default_prompt"], description="The default prompt to use.")
-    default_prompt_negative: str = Field(PRESET["default_prompt_negative"], description="The default negative prompt to use.")
-    default_styles: List[str] = Field(PRESET["default_styles"], description="The default styles to use.")
-    default_aspect_ratio: str = Field(PRESET["default_aspect_ratio"], description="The default aspect ratio to use.")
-    default_overwrite_step: int = Field(PRESET["default_overwrite_step"], description="The default overwrite step to use.")
-    checkpoint_downloads: dict[str, str] = Field(PRESET["checkpoint_downloads"], description="The default checkpoint downloads to use.")
-    embeddings_downloads: dict[str, str] = Field(PRESET["embeddings_downloads"], description="The default embeddings downloads to use.")
-    previous_default_models: List[str] = Field(PRESET["previous_default_models"], description="The default previous default models to use.")
+    default_cfg_scale: float = Field(LAUNCH_ARGUMENTS.current_preset["default_cfg_scale"], description="The default cfg scale to use.")
+    default_sample_sharpness: float = Field(LAUNCH_ARGUMENTS.current_preset["default_sample_sharpness"], description="The default sample sharpness to use.")
+    default_sampler: str = Field(LAUNCH_ARGUMENTS.current_preset["default_sampler"], description="The default sampler to use.")
+    default_scheduler: str = Field(LAUNCH_ARGUMENTS.current_preset["default_scheduler"], description="The default scheduler to use.")
+    default_performance: str = Field(LAUNCH_ARGUMENTS.current_preset["default_performance"], description="The default performance to use.")
+    default_prompt: str = Field(LAUNCH_ARGUMENTS.current_preset["default_prompt"], description="The default prompt to use.")
+    default_prompt_negative: str = Field(LAUNCH_ARGUMENTS.current_preset["default_prompt_negative"], description="The default negative prompt to use.")
+    default_styles: List[str] = Field(LAUNCH_ARGUMENTS.current_preset["default_styles"], description="The default styles to use.")
+    default_aspect_ratio: str = Field(LAUNCH_ARGUMENTS.current_preset["default_aspect_ratio"], description="The default aspect ratio to use.")
+    default_overwrite_step: int = Field(LAUNCH_ARGUMENTS.current_preset["default_overwrite_step"], description="The default overwrite step to use.")
+    checkpoint_downloads: dict[str, str] = Field(LAUNCH_ARGUMENTS.current_preset["checkpoint_downloads"], description="The default checkpoint downloads to use.")
+    embeddings_downloads: dict[str, str] = Field(LAUNCH_ARGUMENTS.current_preset["embeddings_downloads"], description="The default embeddings downloads to use.")
+    previous_default_models: List[str] = Field(LAUNCH_ARGUMENTS.current_preset["previous_default_models"], description="The default previous default models to use.")
     
     default_loras_min_weight: float = Field(2, description="The default loras min weight to use.")
     default_loras_max_weight: float = Field(2, description="The default loras max weight to use.")
@@ -131,24 +177,6 @@ class HookusConfig(BaseModel):
     default_temp_path: str = Field(os.path.join(tempfile.gettempdir(), 'hooocus'), description="The default temp path to use.")
     temp_path_cleanup_on_launch: bool = Field(True, description="The temp path cleanup on launch to use.")
 
-DEFAULT_CONFIG = HookusConfig(**PRESET)
+GLOBAL_CONFIG = HocusConfig(**LAUNCH_ARGUMENTS.current_preset)
 
-
-
-def init_temp_path(path: str | None, default_path: str) -> str:
-    path = DEFAULT_CONFIG.default_temp_path if path is None else path
-
-    if path != '' and path != default_path:
-        try:
-            if not os.path.isabs(path):
-                path = os.path.abspath(path)
-            os.makedirs(path, exist_ok=True)
-            print(f'Using temp path {path}')
-            return path
-        except Exception as e:
-            print(f'Could not create temp path {path}. Reason: {e}')
-            print(f'Using default temp path {default_path} instead.')
-
-    os.makedirs(default_path, exist_ok=True)
-    return default_path
 
