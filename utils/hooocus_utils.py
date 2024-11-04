@@ -3,6 +3,7 @@ from email.mime import image
 import os, sys
 
 from utils import flags
+from utils.data_models import PatchSettings
 current_dir = os.path.dirname(os.path.abspath(__file__))
 running_dir = os.path.dirname(current_dir)
 sys.path.append(running_dir)
@@ -15,8 +16,7 @@ from typing import Literal, Optional
 
 from utils import config
 from utils.flags import CONTROLNET_TASK_TYPES
-from utils.config import DEFAULT_CONFIG, DEFAULT_LAUNCH_ARGUMENTS
-
+from utils.config import GLOBAL_CONFIG
 import modules.style_sorter as style_sorter
 
 
@@ -27,7 +27,7 @@ class LoraTuple(BaseModel):
 
     @field_validator("weight", mode="after")
     def validate_lora_weight(cls, v):
-        if v < DEFAULT_CONFIG.default_loras_min_weight or v > DEFAULT_CONFIG.default_loras_max_weight:
+        if v < GLOBAL_CONFIG.default_loras_min_weight or v > GLOBAL_CONFIG.default_loras_max_weight:
             raise ValueError(f"Invalid lora_weight value: {v}")
         return v
     
