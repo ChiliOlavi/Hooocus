@@ -159,7 +159,6 @@ class ImageGenerationSeed(_BaseImageGenerationObject):
     disable_preview: bool = False
     disable_intermediate_results: bool = False
     disable_seed_increment: bool = False
-    black_out_nsfw: bool = config.default_black_out_nsfw
 
     # TODO type checks
     adm_scaler_positive: float = 1.5 # Min 0.1 max 3.0
