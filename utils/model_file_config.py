@@ -1,15 +1,14 @@
 import os
 from enum import Enum
 from typing import List, Optional
+import numpy
 from pydantic import BaseModel, Field
 
 from pydantic import BaseModel
 
 from modules.model_loader import load_file_from_url
-from utils.config import PathsConfig
-from utils.file_sort_utils import get_files_from_folder, get_model_filenames
+from utils.path_configs import FolderPathsConfig
 from utils.flags import PerformanceLoRA
-
 
 
 class _BaseModelFile(BaseModel):
@@ -32,15 +31,16 @@ class _BaseModelFile(BaseModel):
         )
         return os.path.join(self.model_path_folder, self.model_path_basename)
 
-class BaseControlNetModelFiles(Enum):
+class BaseControlNetModelFiles:
     class _BaseControlNetModelFile(_BaseModelFile):
-        model_path_folder = PathsConfig.path_controlnet.value
+        model_path_folder = FolderPathsConfig.path_controlnet.value
+        def full_path(self):
+            return os.path.join(self.model_path_folder, self.model_path_basename)
     
     ImagePromptClipVIsion = _BaseControlNetModelFile(
         model_name = "clip_vision_vit_h",
         model_url = "https://huggingface.co/lllyasviel/misc/resolve/main/clip_vision_vit_h.safetensors",
         model_path_basename = "clip_vision_vit_h.safetensors",
-
     )
 
     ImagePromptAdapterPlus = _BaseControlNetModelFile(
@@ -62,20 +62,22 @@ class BaseControlNetModelFiles(Enum):
     )
 
     PyraCanny = _BaseControlNetModelFile(
+        controlnet_name = 'pyra_canny',
         model_name = 'canny',
         model_url = 'https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors',
         model_path_basename = 'control-lora-canny-rank128.safetensors',
     )
 
     CPDS = _BaseControlNetModelFile(
+        controlnet_name = 'cpds',
         model_name = 'cpds',
         model_url = 'https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors',
         model_path_basename = 'fooocus_xl_cpds_128.safetensors',
     )
 
-class InpaintModelFiles(Enum):
+class InpaintModelFiles:
     class _InpaintModelFile(_BaseModelFile):
-        model_path_folder = PathsConfig.path_inpaint.value
+        model_path_folder = FolderPathsConfig.path_inpaint.value
 
     InpaintHead = _InpaintModelFile(
         model_name = 'fooocus_inpaint_head.pth',
@@ -107,7 +109,7 @@ class SAM_Files(Enum):
 
     """
     class _SAMFile(_BaseModelFile):
-        model_path_folder = PathsConfig.path_sam.value
+        model_path_folder = FolderPathsConfig.path_sam.value
 
     VIT_B = _SAMFile(
         model_name = 'sam_vit_b_01ec64.pth',
@@ -127,15 +129,19 @@ class SAM_Files(Enum):
         model_path_basename = 'sam_vit_h_4b8939.pth'
     )
 
-class _BaseControlNetTask(BaseModel):
+class BaseControlNetTask(BaseModel):
     stop: float = Field(0.5, ge=0, le=1)
+    img: Optional[numpy.ndarray] = None
     weight: float = Field(1.0, ge=0, le=1)
     models: Optional[List[BaseControlNetModelFiles]] = None
+    name: str = Field(None, description="Name of the ControlNetTask.")
 
-class ControlNetTasks(Enum):
-    ImagePrompt = _BaseControlNetTask(
+class ControlNetTasks:
+    ImagePrompt = BaseControlNetTask(
         stop = 0.5,
+        name = "ImagePrompt",
         weight = 0.6,
+        img = None,
         models = [
             BaseControlNetModelFiles.ImagePromptClipVIsion, 
             BaseControlNetModelFiles.ImagePromptAdapterPlus,
@@ -143,8 +149,10 @@ class ControlNetTasks(Enum):
         ]
     )
     
-    FaceSwap = _BaseControlNetTask(
+    FaceSwap = BaseControlNetTask(
         stop = 0.9,
+        img = None,
+        name = "FaceSwap",
         weight = 0.75,
         models = [
             BaseControlNetModelFiles.ImagePromptClipVIsion,
@@ -153,16 +161,20 @@ class ControlNetTasks(Enum):
         ]
     )
 
-    PyraCanny = _BaseControlNetTask(
+    PyraCanny = BaseControlNetTask(
         stop = 0.5,
+        img = None,
+        name = "PyraCanny",
         weight = 1.0,
         models = [
             BaseControlNetModelFiles.PyraCanny
         ]
         )
 
-    CPDS = _BaseControlNetTask(    
+    CPDS = BaseControlNetTask(    
         stop = 0.5,
+        img = None,
+        name = "CPDS",
         weight = 1.0,
         models = [
             BaseControlNetModelFiles.CPDS
@@ -173,39 +185,35 @@ UpscaleModel = _BaseModelFile(
     model_url="https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin",
     model_name="fooocus_upscaler",
     model_path_basename="fooocus_upscaler_s409985e5.bin",
-    model_path_folder=PathsConfig.path_upscale_models.value
+    model_path_folder=FolderPathsConfig.path_upscale_models.value
 )
 
 SafetyCheckModel = _BaseModelFile(
     model_url="https://huggingface.co/mashb1t/misc/resolve/main/stable-diffusion-safety-checker.bin",
     model_name="fooocus_safety_check",
     model_path_basename="stable-diffusion-safety-checker.bin",
-    model_path_folder=PathsConfig.path_safety_checker.value
+    model_path_folder=FolderPathsConfig.path_safety_checker.value
 )
 
 SDXL_LightningLoRA = _BaseModelFile(
     model_url="https://huggingface.co/mashb1t/misc/resolve/main/sdxl_lightning_4step_lora.safetensors",
     model_name=PerformanceLoRA.LIGHTNING.value,
     model_path_basename=PerformanceLoRA.LIGHTNING.value,
-    model_path_folder=PathsConfig.path_loras.value
+    model_path_folder=FolderPathsConfig.path_loras.value
 )
 
 SDXL_HyperSDLoRA = _BaseModelFile(
     model_url="https://huggingface.co/mashb1t/misc/resolve/main/sdxl_hyper_sd_4step_lora.safetensors",
     model_name=PerformanceLoRA.HYPER_SD.value,
     model_path_basename=PerformanceLoRA.HYPER_SD.value,
-    model_path_folder=PathsConfig.path_loras.value
+    model_path_folder=FolderPathsConfig.path_loras.value
 )
 
 SDXL_LCM_LoRA = _BaseModelFile(
     model_url="https://huggingface.co/lllyasviel/misc/resolve/main/sdxl_lcm_lora.safetensors",
     model_name=PerformanceLoRA.EXTREME_SPEED.value,
     model_path_basename=PerformanceLoRA.EXTREME_SPEED.value,
-    model_path_folder=PathsConfig.path_loras.value
+    model_path_folder=FolderPathsConfig.path_loras.value
 )
 
-
-MODEL_FILENAMES = get_model_filenames(PathsConfig.path_checkpoints.value)
-LORA_FILENAMES = get_model_filenames(PathsConfig.path_loras.value)
-VAE_FILENAMES = get_model_filenames(PathsConfig.path_vae.value)
-WILDCARD_FILENAMES = get_files_from_folder(PathsConfig.path_wildcards.value, ['.txt'])
+ControlNetTasks = 

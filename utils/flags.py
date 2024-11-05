@@ -1,31 +1,73 @@
 import sys, os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from enum import IntEnum, Enum
-from typing import List, Literal, Optional
-
+import numpy
 from pydantic import BaseModel, Field
 
-from modules.extra_utils import get_files_from_folder
-from modules.model_loader import load_file_from_url
-from modules import style_sorter
-from modules.sdxl_styles import legal_style_names
+from utils.filesystem_utils import get_files_from_folder, get_model_filenames, get_presets
+from utils.path_configs import FolderPathsConfig
 
-from utils import config
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from enum import IntEnum, Enum
+from typing import Literal
+import tempfile
+from utils.logging_util import LoggingUtil
+
+log = LoggingUtil().get_logger()
 
 
 
-class AvailableConfigs:
-    enhancement_uov_before = "Before First Enhancement"
-    enhancement_uov_after = "After Last Enhancement"
-    enhancement_uov_processing_order = [enhancement_uov_before, enhancement_uov_after]
-    literal_enhancement_proceccing_order = Literal["Before First Enhancement", "After Last Enhancement"]
-    enhancement_uov_prompt_type_original = 'Original Prompts'
-    enhancement_uov_prompt_type_last_filled = 'Last Filled Enhancement Prompts'
-    enhancement_uov_prompt_types = [enhancement_uov_prompt_type_original, enhancement_uov_prompt_type_last_filled]
+DESCRIBE_TYPE_PHOTO = 'Photograph'
+DESCRIBE_TYPE_ANIME = 'Art/Anime'
+DESCRIBE_TYPES = [DESCRIBE_TYPE_PHOTO, DESCRIBE_TYPE_ANIME]
 
-CIVITAI_NO_KARRAS = ["euler", "euler_ancestral", "heun", "dpm_fast", "dpm_adaptive", "ddim", "uni_pc"]
+literal_enhancement_proceccing_order = Literal["Before First Enhancement", "After Last Enhancement"]
 
+ENHANCEMENT_UOV_BEFORE = "Before First Enhancement"
+ENHANCEMENT_UOV_AFTER = "After Last Enhancement"
+ENHANCEMENT_UOV_PROCESSING_ORDER = [ENHANCEMENT_UOV_BEFORE, ENHANCEMENT_UOV_AFTER]
+
+ENHANCEMENT_UOV_PROMPT_TYPE_ORIGINAL = 'Original Prompts'
+ENHANCEMENT_UOV_PROMPT_TYPE_LAST_FILLED = 'Last Filled Enhancement Prompts'
+ENHANCEMENT_UOV_PROMPT_TYPES = [ENHANCEMENT_UOV_PROMPT_TYPE_ORIGINAL, ENHANCEMENT_UOV_PROMPT_TYPE_LAST_FILLED]
+
+SDXL_ASPECT_RATIOS = Literal[
+    '704*1408', '704*1344', '768*1344', '768*1280', '832*1216', '832*1152',
+    '896*1152', '896*1088', '960*1088', '960*1024', '1024*1024', '1024*960',
+    '1088*960', '1088*896', '1152*896', '1152*832', '1216*832', '1280*768',
+    '1344*768', '1344*704', '1408*704', '1472*704', '1536*640', '1600*640',
+    '1664*576', '1728*576'
+]
+
+INPUT_IMAGE_MODES = Literal['uov', 'inpaint', 'ip', 'desc', 'enhance', 'metadata']
+
+OUTPAINT_SELECTIONS = Literal['Left', 'Right', 'Top', 'Bottom']
+
+REFINER_SWAP_METHODS = Literal['joint', 'separate', 'vae']
+
+CONTROLNET_TASK_TYPES = Literal["ImagePrompt", "FaceSwap", "PyraCanny", "CPDS"]    
+
+EXAMPLE_ENHANCE_DETECTION_PROMPTS = [
+        'face', 'eye', 'mouth', 'hair', 'hand', 'body'
+    ],
+
+UPSCALE_OR_VARIATION_MODES = Literal[
+        'Enabled',
+        'Vary (Subtle)',
+        'Vary (Strong)',
+        'Upscale (1.5x)',
+        'Upscale (2x)',
+        'Upscale (Fast 2x)',
+]
+
+CIVITAI_NO_KARRAS = Literal["euler", "euler_ancestral", "heun", "dpm_fast", "dpm_adaptive", "ddim", "uni_pc"]
+
+max_image_number: int = 32
+max_lora_number: int = 5
+loras_max_weight: float = 2.0
+loras_min_weight: float = 2.0
+sam_max_detections: int = 0 #The default sam max detections to use.
+
+INPAINT_MASK_CLOTH_CATEGORY = Literal['full', 'upper', 'lower']
 
 class KSAMPLER(Enum): 
     euler = "Euler"
@@ -57,27 +99,29 @@ class EXTRA_KSAMPLER(Enum):
 
 # Both KSAMPLER and EXTRA_KSAMPLER
 KSAMPLER_NAMES = [k.value for k in KSAMPLER] + [k.value for k in EXTRA_KSAMPLER]
-KSAMPLER_NAMES_LITERAL = Literal[KSAMPLER_NAMES]
 SAMPLERS = KSAMPLER | EXTRA_KSAMPLER
+DEFAULT_SAMPLER = KSAMPLER.dpmpp_2m_sde_gpu
 
 SCHEDULER_NAMES = ["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform", "lcm", "turbo", "align_your_steps", "tcd", "edm_playground_v2.5"]
+SCHEDULER_NAMES_LITERAL = Literal[SCHEDULER_NAMES]
 
 class _AvailableConfigsBase(Enum):
-
-    @classmethod
-    def literalize(cls):
-        #values_held = [v for k, v in cls.__dict__.items() if not k.startswith('_') and not callable(v) and not isinstance(v, classmethod)]
-        values_held = [v.value for v in cls]
-        return Literal[tuple(values_held)]
+    pass
     
 
-class OutputFormat(_AvailableConfigsBase):
+
+class LatentPreviewMethod(_AvailableConfigsBase):
+    NoPreviews = "none"
+    Auto = "auto"
+    Latent2RGB = "fast"
+    TAESD = "taesd"
+
+
+class OutputFormat(Enum):
     PNG = 'png'
     JPEG = 'jpeg'
     WEBP = 'webp'
     
-OUTPUT_FORMATS = OutputFormat.literalize()
-
 class PerformanceLoRA(_AvailableConfigsBase):
     QUALITY = None
     SPEED = None
@@ -138,35 +182,22 @@ class Performance(_AvailableConfigsBase):
         return PerformanceLoRA[self.name].value if self.name in PerformanceLoRA.__members__ else None
 
 
-def get_presets():
-    preset_folder = 'presets'
-    presets = ['initial']
-    if not os.path.exists(preset_folder):
-        print('No presets found.')
-        return presets
 
-    return presets + [f[:f.index(".json")] for f in os.listdir(preset_folder) if f.endswith('.json')]
+class DefaultControlNetTasks(Enum):
+    ImagePrompt = "ImagePrompt"
+    ImagePromptFaceSwap = "FaceSwap"
+    PyraCanny = "PyraCanny"
+    CPDS = "CPDS"
 
 AVAILABLE_PRESETS = get_presets()
+MODEL_FILENAMES = get_model_filenames(FolderPathsConfig.path_checkpoints.value)
+LORA_FILENAMES = get_model_filenames(FolderPathsConfig.path_loras.value)
+VAE_FILENAMES = get_model_filenames(FolderPathsConfig.path_vae.value)
+WILDCARD_FILENAMES = get_files_from_folder(FolderPathsConfig.path_wildcards.value, ['.txt'])
 
-
-style_sorter.try_load_sorted_styles(legal_style_names, config.default_styles)
-all_styles = style_sorter.all_styles
-all_loras = config.lora_filenames
 performance_lora_keys = PerformanceLoRA.__members__.keys()
 performance_keys = Performance.__members__.keys()
 
-ALLOWED_TABS = Literal['uov', 'inpaint', 'ip', 'desc', 'enhance', 'metadata']
-OUTPAINT_SELECTIONS = Literal['Left', 'Right', 'Top', 'Bottom']
-REFINER_SWAP_METHODS = Literal['joint', 'separate', 'vae']
-CONTROLNET_TASK_TYPES = Literal["ImagePrompt", "FaceSwap", "PyraCanny", "CPDS"]    
 
-UPSCALE_OR_VARIATION_MODES = Literal[
-        'Enabled',
-        'Vary (Subtle)',
-        'Vary (Strong)',
-        'Upscale (1.5x)',
-        'Upscale (2x)',
-        'Upscale (Fast 2x)',
-]
+
 

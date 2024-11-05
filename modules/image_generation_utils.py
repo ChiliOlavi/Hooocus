@@ -2,12 +2,10 @@ import sys, os
 from typing import List
 
 from utils import config, flags
-from utils.model_download_util import downloading_controlnet_canny
+from utils.model_file_config import InpaintModelFiles
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from utils.consts import HOOOCUS_VERSION, METADATA_SCHEME
-from utils.hooocus_utils import ImageGenerationSeed
 from modules import patch, meta_parser
 from modules.private_logger import log
 import math
@@ -17,17 +15,18 @@ import random
 import copy
 import cv2
 import modules.default_pipeline as pipeline
-import modules.core as core
+from modules.core import encode_vae, numpy_to_pytorch
 import utils.flags as flags
 import modules.patch
 import ldm_patched.modules.model_management
 import extras.preprocessors as preprocessors
-import modules.inpaint_worker as inpaint_worker
 import extras.ip_adapter as ip_adapter
 import extras.face_crop
 
+from utils.model_file_config import UpscaleModel, InpaintModelFiles
+
 from extras.censor import default_censor
-from modules.sdxl_styles import (
+from utils.sdxl_prompt_expansion_utils import (
     apply_style,
     get_random_style,
     apply_arrays,
@@ -52,9 +51,9 @@ from utils.logging_util import LoggingUtil
 from utils.config import MAX_SEED
 
 
-def progressbar(async_task: ImageGenerationSeed, number, text):
+def progressbar(number, text):
     print(f"[Hooocus] {text}")
-    async_task.yields.append(["preview", (number, text, None)])
+    return["preview", (number, text, None)]
 
 def save_and_log(
         async_task: ImageGenerationSeed,
@@ -246,7 +245,7 @@ def prepare_enhance_prompt(prompt: str, fallback_prompt: str):
 
 
 def apply_image_input(
-    async_task: ImageGenerationSeed,
+    async_task: config.ImageGenerationObject,
     base_model_additional_loras,
     clip_vision_path,
     controlnet_canny_path,
@@ -265,10 +264,10 @@ def apply_image_input(
 
     if (
         (
-            async_task.should_upscale_or_vary
+            async_task.use_upscale_or_vary
             or (
-                async_task.should_use_imageprompt   
-                and async_task.mixing_image_prompt_and_vary_upscale
+                async_task.use_imageprompt
+                and async_task.mix_image_prompt_and_vary_upscale
             )
         )
         and async_task.uov_method and async_task.uov_input_image is not None
@@ -286,89 +285,67 @@ def apply_image_input(
             )
         )
     if (
-        async_task.should_inpaint or (async_task.should_use_imageprompt and async_task.mixing_image_prompt_and_inpaint)) and async_task.inpaint_input_image is not None:
-        inpaint_image = async_task.inpaint_input_image["image"]
-        inpaint_mask = async_task.inpaint_input_image["mask"][:, :, 0]
+        async_task.inpaint_options or (async_task.use_imageprompt and async_task.mix_image_prompt_and_inpaint)):
+        
+        inpaint_options = async_task.inpaint_options
+        inpaint_image = inpaint_options.inpaint_input_image["image"]
+        inpaint_mask = inpaint_options.inpaint_input_image["mask"][:, :, 0]
 
-        if async_task.inpaint_advanced_masking_checkbox:
-            if isinstance(async_task.inpaint_mask_image_upload, dict):
-                if (
-                    isinstance(
-                        async_task.inpaint_mask_image_upload["image"], np.ndarray
-                    )
-                    and isinstance(
-                        async_task.inpaint_mask_image_upload["mask"], np.ndarray
-                    )
-                    and async_task.inpaint_mask_image_upload["image"].ndim == 3
-                ):
-                    async_task.inpaint_mask_image_upload = np.maximum(
-                        async_task.inpaint_mask_image_upload["image"],
-                        async_task.inpaint_mask_image_upload["mask"],
-                    )
-            if (
-                isinstance(async_task.inpaint_mask_image_upload, np.ndarray)
-                and async_task.inpaint_mask_image_upload.ndim == 3
-            ):
+        if inpaint_options.use_advanced_inpaint_masking:
+            if inpaint_options.inpaint_mask_image_upload:
+                image_mask_uploaded = np.maximum(
+                    inpaint_options.inpaint_mask_image_upload["image"],
+                    inpaint_options.inpaint_mask_image_upload["mask"])
+                
                 H, W, C = inpaint_image.shape
-                async_task.inpaint_mask_image_upload = resample_image(
-                    async_task.inpaint_mask_image_upload, width=W, height=H
+                image_mask_uploaded = resample_image(
+                    image_mask_uploaded, width=W, height=H
                 )
-                async_task.inpaint_mask_image_upload = np.mean(
-                    async_task.inpaint_mask_image_upload, axis=2
+                image_mask_uploaded = np.mean(
+                    image_mask_uploaded, axis=2
                 )
-                async_task.inpaint_mask_image_upload = (
-                    async_task.inpaint_mask_image_upload > 127
+                image_mask_uploaded = (
+                    image_mask_uploaded > 127
                 ).astype(np.uint8) * 255
-                inpaint_mask = np.maximum(
-                    inpaint_mask, async_task.inpaint_mask_image_upload
-                )
+                inpaint_mask = np.maximum(inpaint_mask, image_mask_uploaded)
 
-        if int(async_task.inpaint_erode_or_dilate) != 0:
+        if int(inpaint_options.inpaint_erode_or_dilate) != 0:
             inpaint_mask = erode_or_dilate(
-                inpaint_mask, async_task.inpaint_erode_or_dilate
+                inpaint_mask, inpaint_options.inpaint_erode_or_dilate
             )
 
-        if async_task.invert_mask_checkbox:
+        if inpaint_options.invert_mask:
             inpaint_mask = 255 - inpaint_mask
 
         inpaint_image = ensure_three_channels(inpaint_image)
-        if (
-            isinstance(inpaint_image, np.ndarray)
-            and isinstance(inpaint_mask, np.ndarray)
-            and (
-                np.any(inpaint_mask > 127)
-                or len(async_task.outpaint_selections) > 0
-            )
-        ):
+        if (np.any(inpaint_mask > 127) or len(inpaint_options.outpaint_selections) > 0):
             progressbar(async_task, 1, "Downloading upscale models ...")
-            config.downloading_upscale_model()
+            UpscaleModel.download_model()
             if inpaint_parameterized:
                 progressbar(async_task, 1, "Downloading inpainter ...")
-                inpaint_head_model_path, inpaint_patch_model_path = (
-                    config.downloading_inpaint_models(
-                        async_task.inpaint_engine
-                    )
-                )
+                inpaint_head_model_path = InpaintModelFiles.InpaintHead.download_model()
+                inpaint_patch_model_path = (InpaintModelFiles.InpaintPatchV26.download_model())
                 base_model_additional_loras += [(inpaint_patch_model_path, 1.0)]
-                print(
-                    f"[Inpaint] Current inpaint model is {inpaint_patch_model_path}"
-                )
-                if async_task.refiner_model_name == "None":
+                
+                print(f"[Inpaint] Current inpaint model is {inpaint_patch_model_path}")
+                
+                if not async_task.refiner_model:
                     use_synthetic_refiner = True
                     async_task.refiner_switch = 0.8
             else:
                 inpaint_head_model_path, inpaint_patch_model_path = None, None
                 print(f"[Inpaint] Parameterized inpaint is disabled.")
-            if async_task.inpaint_additional_prompt != "":
+
+            if inpaint_options.inpaint_additional_prompt:
                 if async_task.prompt == "":
-                    async_task.prompt = async_task.inpaint_additional_prompt
+                    async_task.prompt = inpaint_options.inpaint_additional_prompt
                 else:
                     async_task.prompt = (
-                        async_task.inpaint_additional_prompt
+                        inpaint_options.inpaint_additional_prompt
                         + "\n"
                         + async_task.prompt
                     )
-            goals.append("inpaint")
+            async_task.goals.append("inpaint")
     if (
         async_task.current_tab == "ip"
         or async_task.mixing_image_prompt_and_vary_upscale
@@ -457,71 +434,9 @@ def patch_samplers(async_task):
 
     return final_scheduler_name
 
-def set_hyper_sd_defaults(async_task: ImageGenerationSeed, current_progress, advance_progress=False):
-    print("Enter Hyper-SD mode.")
-    if advance_progress:
-        current_progress += 1
-    progressbar(async_task, current_progress, "Downloading Hyper-SD components ...")
-    async_task.performance_loras += [
-        (modules.config.downloading_sdxl_hyper_sd_lora(), 0.8)
-    ]
-    if async_task.refiner_model_name != "None":
-        print(f"Refiner disabled in Hyper-SD mode.")
-    async_task.refiner_model_name = "None"
-    async_task.sampler_name = "dpmpp_sde_gpu"
-    async_task.scheduler_name = "karras"
-    async_task.sharpness = 0.0
-    async_task.cfg_scale = 1.0
-    async_task.adaptive_cfg = 1.0
-    async_task.refiner_switch = 1.0
-    async_task.adm_scaler_positive = 1.0
-    async_task.adm_scaler_negative = 1.0
-    async_task.adm_scaler_end = 0.0
-    return current_progress
 
-def set_lightning_defaults(async_task: ImageGenerationSeed, current_progress, advance_progress=False):
-    print("Enter Lightning mode.")
-    if advance_progress:
-        current_progress += 1
-    progressbar(async_task, 1, "Downloading Lightning components ...")
-    async_task.performance_loras += [
-        (config.downloading_sdxl_lightning_lora(), 1.0)
-    ]
-    if async_task.refiner_model_name != "None":
-        print(f"Refiner disabled in Lightning mode.")
-    async_task.refiner_model_name = "None"
-    async_task.sampler_name = "euler"
-    async_task.scheduler_name = "sgm_uniform"
-    async_task.sharpness = 0.0
-    async_task.cfg_scale = 1.0
-    async_task.adaptive_cfg = 1.0
-    async_task.refiner_switch = 1.0
-    async_task.adm_scaler_positive = 1.0
-    async_task.adm_scaler_negative = 1.0
-    async_task.adm_scaler_end = 0.0
-    return current_progress
 
-def set_lcm_defaults(async_task, current_progress, advance_progress=False):
-    print("Enter LCM mode.")
-    if advance_progress:
-        current_progress += 1
-    progressbar(async_task, 1, "Downloading LCM components ...")
-    async_task.performance_loras += [
-        (modules.config.downloading_sdxl_lcm_lora(), 1.0)
-    ]
-    if async_task.refiner_model_name != "None":
-        print(f"Refiner disabled in LCM mode.")
-    async_task.refiner_model_name = "None"
-    async_task.sampler_name = "lcm"
-    async_task.scheduler_name = "lcm"
-    async_task.sharpness = 0.0
-    async_task.cfg_scale = 1.0
-    async_task.adaptive_cfg = 1.0
-    async_task.refiner_switch = 1.0
-    async_task.adm_scaler_positive = 1.0
-    async_task.adm_scaler_negative = 1.0
-    async_task.adm_scaler_end = 0.0
-    return current_progress
+
 
 
 def apply_overrides(async_task, steps, height, width):
@@ -536,180 +451,6 @@ def apply_overrides(async_task, steps, height, width):
         height = async_task.overwrite_height
     return steps, switch, width, height
 
-def process_prompt(
-    async_task,
-    prompt,
-    negative_prompt,
-    base_model_additional_loras,
-    image_number,
-    disable_seed_increment,
-    use_expansion,
-    use_style,
-    use_synthetic_refiner,
-    current_progress,
-    advance_progress=False,
-):
-    prompts = remove_empty_str(
-        [safe_str(p) for p in prompt.splitlines()], default=""
-    )
-    negative_prompts = remove_empty_str(
-        [safe_str(p) for p in negative_prompt.splitlines()], default=""
-    )
-    prompt = prompts[0]
-    negative_prompt = negative_prompts[0]
-    if prompt == "":
-        # disable expansion when empty since it is not meaningful and influences image prompt
-        use_expansion = False
-    extra_positive_prompts = prompts[1:] if len(prompts) > 1 else []
-    extra_negative_prompts = (
-        negative_prompts[1:] if len(negative_prompts) > 1 else []
-    )
-    if advance_progress:
-        current_progress += 1
-    progressbar(async_task, current_progress, "Loading models ...")
-    lora_filenames = modules.util.remove_performance_lora(
-        modules.config.lora_filenames, async_task.performance_selection
-    )
-    loras, prompt = parse_lora_references_from_prompt(
-        prompt,
-        async_task.loras,
-        modules.config.default_max_lora_number,
-        lora_filenames=lora_filenames,
-    )
-    loras += async_task.performance_loras
-    pipeline.refresh_everything(
-        refiner_model_name=async_task.refiner_model_name,
-        base_model_name=async_task.base_model_name,
-        loras=loras,
-        base_model_additional_loras=base_model_additional_loras,
-        use_synthetic_refiner=use_synthetic_refiner,
-        vae_name=async_task.vae_name,
-    )
-    pipeline.set_clip_skip(async_task.clip_skip)
-    if advance_progress:
-        current_progress += 1
-    progressbar(async_task, current_progress, "Processing prompts ...")
-    tasks = []
-    for i in range(image_number):
-        if disable_seed_increment:
-            task_seed = async_task.seed % (MAX_SEED + 1)
-        else:
-            task_seed = (async_task.seed + i) % (
-                MAX_SEED + 1
-            )  # randint is inclusive, % is not
-
-        task_rng = random.Random(
-            task_seed
-        )  # may bind to inpaint noise in the future
-        task_prompt = apply_wildcards(
-            prompt, task_rng, i, async_task.read_wildcards_in_order
-        )
-        task_prompt = apply_arrays(task_prompt, i)
-        task_negative_prompt = apply_wildcards(
-            negative_prompt, task_rng, i, async_task.read_wildcards_in_order
-        )
-        task_extra_positive_prompts = [
-            apply_wildcards(pmt, task_rng, i, async_task.read_wildcards_in_order)
-            for pmt in extra_positive_prompts
-        ]
-        task_extra_negative_prompts = [
-            apply_wildcards(pmt, task_rng, i, async_task.read_wildcards_in_order)
-            for pmt in extra_negative_prompts
-        ]
-
-        positive_basic_workloads = []
-        negative_basic_workloads = []
-
-        task_styles = async_task.style_selections.copy()
-        if use_style:
-            placeholder_replaced = False
-
-            for j, s in enumerate(task_styles):
-                if s == random_style_name:
-                    s = get_random_style(task_rng)
-                    task_styles[j] = s
-                p, n, style_has_placeholder = apply_style(s, positive=task_prompt)
-                if style_has_placeholder:
-                    placeholder_replaced = True
-                positive_basic_workloads = positive_basic_workloads + p
-                negative_basic_workloads = negative_basic_workloads + n
-
-            if not placeholder_replaced:
-                positive_basic_workloads = [task_prompt] + positive_basic_workloads
-        else:
-            positive_basic_workloads.append(task_prompt)
-
-        negative_basic_workloads.append(
-            task_negative_prompt
-        )  # Always use independent workload for negative.
-
-        positive_basic_workloads = (
-            positive_basic_workloads + task_extra_positive_prompts
-        )
-        negative_basic_workloads = (
-            negative_basic_workloads + task_extra_negative_prompts
-        )
-
-        positive_basic_workloads = remove_empty_str(
-            positive_basic_workloads, default=task_prompt
-        )
-        negative_basic_workloads = remove_empty_str(
-            negative_basic_workloads, default=task_negative_prompt
-        )
-
-        tasks.append(
-            dict(
-                task_seed=task_seed,
-                task_prompt=task_prompt,
-                task_negative_prompt=task_negative_prompt,
-                positive=positive_basic_workloads,
-                negative=negative_basic_workloads,
-                expansion="",
-                c=None,
-                uc=None,
-                positive_top_k=len(positive_basic_workloads),
-                negative_top_k=len(negative_basic_workloads),
-                log_positive_prompt="\n".join(
-                    [task_prompt] + task_extra_positive_prompts
-                ),
-                log_negative_prompt="\n".join(
-                    [task_negative_prompt] + task_extra_negative_prompts
-                ),
-                styles=task_styles,
-            )
-        )
-    if use_expansion:
-        if advance_progress:
-            current_progress += 1
-        for i, t in enumerate(tasks):
-
-            progressbar(
-                async_task, current_progress, f"Preparing Fooocus text #{i + 1} ..."
-            )
-            expansion = pipeline.final_expansion(t["task_prompt"], t["task_seed"])
-            print(f"[Prompt Expansion] {expansion}")
-            t["expansion"] = expansion
-            t["positive"] = copy.deepcopy(t["positive"]) + [expansion]  # Deep copy.
-    if advance_progress:
-        current_progress += 1
-    for i, t in enumerate(tasks):
-        progressbar(async_task, current_progress, f"Encoding positive #{i + 1} ...")
-        t["c"] = pipeline.clip_encode(
-            texts=t["positive"], pool_top_k=t["positive_top_k"]
-        )
-    if advance_progress:
-        current_progress += 1
-    for i, t in enumerate(tasks):
-        if abs(float(async_task.cfg_scale) - 1.0) < 1e-4:
-            t["uc"] = pipeline.clone_cond(t["c"])
-        else:
-            progressbar(
-                async_task, current_progress, f"Encoding negative #{i + 1} ..."
-            )
-            t["uc"] = pipeline.clip_encode(
-                texts=t["negative"], pool_top_k=t["negative_top_k"]
-            )
-    return tasks, use_expansion, loras, current_progress
 
 
 def stop_processing(async_task, processing_start_time):
@@ -1001,10 +742,6 @@ def enhance_upscale(
 
 
 
-def apply_patch_settings(patch_settings: modules.patch.PatchSettings, current_patch_settings, pid):
-
-    current_patch_settings[pid] = modules.patch.PatchSettings(**patch_settings)
-    
 
 
 
@@ -1167,7 +904,7 @@ def apply_inpaint(
             async_task, inpaint_image, inpaint_mask
         )
 
-    inpaint_worker.current_task = inpaint_worker.InpaintWorker(
+    async_task.current_task = inpaint_worker.InpaintWorker(
         image=inpaint_image,
         mask=inpaint_mask,
         use_fill=denoising_strength > 0.99,
@@ -1183,9 +920,7 @@ def apply_inpaint(
         )
         raise EarlyReturnException
 
-    if advance_progress:
-        current_progress += 1
-    progressbar(async_task, current_progress, "VAE Inpaint encoding ...")
+
     inpaint_pixel_fill = core.numpy_to_pytorch(
         inpaint_worker.current_task.interested_fill
     )
@@ -1195,6 +930,7 @@ def apply_inpaint(
     inpaint_pixel_mask = core.numpy_to_pytorch(
         inpaint_worker.current_task.interested_mask
     )
+    
     candidate_vae, candidate_vae_swap = pipeline.get_candidate_vae(
         steps=async_task.steps,
         switch=switch,
@@ -1204,6 +940,7 @@ def apply_inpaint(
     latent_inpaint, latent_mask = core.encode_vae_inpaint(
         mask=inpaint_pixel_mask, vae=candidate_vae, pixels=inpaint_pixel_image
     )
+    
     latent_swap = None
     if candidate_vae_swap is not None:
         if advance_progress:
@@ -1292,20 +1029,14 @@ def apply_outpaint(async_task, inpaint_image, inpaint_mask):
     return inpaint_image, inpaint_mask
 
 def apply_upscale(
-    async_task,
     uov_input_image,
     uov_method,
-    switch,
-    current_progress,
-    advance_progress=False,
-):
+    candidate_vae,
+    overwrite_upscale_strength):
+
     H, W, C = uov_input_image.shape
-    if advance_progress:
-        current_progress += 1
-    progressbar(
-        async_task, current_progress, f"Upscaling image from {str((W, H))} ..."
-    )
     uov_input_image = perform_upscale(uov_input_image)
+    
     print(f"Image upscaled.")
     if "1.5x" in uov_method:
         f = 1.5
@@ -1340,31 +1071,24 @@ def apply_upscale(
             None,
             None,
             None,
-            None,
-            current_progress,
+            None
         )
 
     tiled = True
-    denoising_strength = 0.382
-    if async_task.overwrite_upscale_strength > 0:
-        denoising_strength = async_task.overwrite_upscale_strength
-    initial_pixels = core.numpy_to_pytorch(uov_input_image)
-    if advance_progress:
-        current_progress += 1
-    progressbar(async_task, current_progress, "VAE encoding ...")
-    candidate_vae, _ = pipeline.get_candidate_vae(
-        steps=async_task.steps,
-        switch=switch,
-        denoise=denoising_strength,
-        refiner_swap_method=async_task.refiner_swap_method,
-    )
-    initial_latent = core.encode_vae(
+    
+    if overwrite_upscale_strength > 0:
+        denoising_strength = overwrite_upscale_strength
+    
+    initial_pixels = numpy_to_pytorch(uov_input_image)
+
+    initial_latent = encode_vae(
         vae=candidate_vae, pixels=initial_pixels, tiled=True
     )
     B, C, H, W = initial_latent["samples"].shape
     width = W * 8
     height = H * 8
     print(f"Final resolution is {str((width, height))}.")
+    
     return (
         direct_return,
         uov_input_image,
@@ -1373,7 +1097,6 @@ def apply_upscale(
         tiled,
         width,
         height,
-        current_progress,
     )
 
 
