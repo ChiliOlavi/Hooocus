@@ -200,8 +200,9 @@ class ImageGenerationSeed(_BaseImageGenerationObject):
 
     debugging_inpaint_preprocessor: bool = False
     inpaint_disable_initial_latent: bool = False
-    inpaint_engine: str = config.default_inpaint_engine_version
+    inpaint_engine: str = config.GLOBAL_CONFIG.default_inpaint_engine_version
     @field_validator("inpaint_engine", mode="after")
+    
     def validate_inpaint_engine(cls, v):
         if v not in flags.inpaint_engine_versions:
             raise ValueError(f"Invalid inpaint engine version: {v}")
