@@ -3,7 +3,6 @@ import os
 import torch
 import modules.patch
 import utils.config
-import utils.consts
 import utils.flags
 import ldm_patched.modules.model_management
 import ldm_patched.modules.latent_formats

@@ -1,9 +1,7 @@
-from ast import List
-from email.mime import image
 import os, sys
 
+from modules.patch import PatchSettings
 from utils import flags
-from utils.data_models import PatchSettings
 current_dir = os.path.dirname(os.path.abspath(__file__))
 running_dir = os.path.dirname(current_dir)
 sys.path.append(running_dir)
@@ -12,12 +10,12 @@ sys.path.append(running_dir)
 import numpy
 import random
 from pydantic import BaseModel, Field, field_validator
-from typing import Literal, Optional
+from typing import Optional
 
 from utils import config
 from utils.flags import CONTROLNET_TASK_TYPES
 from utils.config import GLOBAL_CONFIG
-import modules.style_sorter as style_sorter
+from utils.file_sort_utils import StyleSorter
 
 
 class LoraTuple(BaseModel):

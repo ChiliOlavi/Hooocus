@@ -6,7 +6,8 @@ from utils import config
 from modules.hash_cache import init_cache, load_cache_from_file
 from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
 from modules.model_loader import load_file_from_url
-from utils.consts import REINSTALL_ALL, TRY_INSTALL_XFORMERS, HOOOCUS_VERSION
+from utils.config import GlobalEnv
+
 
 print('[System ARGV] ' + str(sys.argv))
 vae_approx_filenames = [
@@ -26,13 +27,13 @@ def prepare_environment():
     requirements_file = os.environ.get('REQS_FILE', "utils/requirements_versions.txt")
 
     print(f"Python {sys.version}")
-    print(f"Fooocus version: {HOOOCUS_VERSION}")
+    print(f"Hocus version: {GlobalEnv.HOOOCUS_VERSION}")
 
-    if REINSTALL_ALL or not is_installed("torch") or not is_installed("torchvision"):
+    if GlobalEnv.REINSTALL_ALL or not is_installed("torch") or not is_installed("torchvision"):
         run(f'"{python}" -m {torch_command}', "Installing torch and torchvision", "Couldn't install torch", live=True)
 
-    if TRY_INSTALL_XFORMERS:
-        if REINSTALL_ALL or not is_installed("xformers"):
+    if GlobalEnv.TRY_INSTALL_XFORMERS:
+        if GlobalEnv.REINSTALL_ALL or not is_installed("xformers"):
             xformers_package = os.environ.get('XFORMERS_PACKAGE', 'xformers==0.0.23')
             if platform.system() == "Windows":
                 if platform.python_version().startswith("3.10"):
@@ -46,7 +47,7 @@ def prepare_environment():
             elif platform.system() == "Linux":
                 run_pip(f"install -U -I --no-deps {xformers_package}", "xformers")
 
-    if REINSTALL_ALL or not requirements_met(requirements_file):
+    if GlobalEnv.REINSTALL_ALL or not requirements_met(requirements_file):
         run_pip(f"install -r \"{requirements_file}\"", "requirements")
 
     args = ini_args()

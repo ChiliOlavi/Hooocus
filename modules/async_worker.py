@@ -33,11 +33,11 @@ from utils.logging_util import LoggingUtil
 from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_all
 
-from utils.hookus_utils import ImageGenerationSeed
+from utils.hooocus_utils import ImageGenerationSeed
 
 patch_all()
 
-DefConf = config.DEFAULT_CONFIG
+GlobalConfig = config.GLOBAL_CONFIG
 logger = LoggingUtil().get_logger()
 
 async_tasks: list[ImageGenerationSeed] = []
@@ -66,12 +66,7 @@ def worker():
     from modules.private_logger import log
     from modules.util import erode_or_dilate
     from utils.flags import Performance
-    from modules.image_generation_utils import (
-        progressbar, 
-        set_lcm_defaults, 
-        set_lightning_defaults, 
-        set_hyper_sd_defaults
-    )
+    from modules.image_generation_utils import progressbar
 
     pid = os.getpid()
     print(f"Started worker with PID {pid}")
@@ -80,14 +75,10 @@ def worker():
         async_task: ImageGenerationSeed,
         imgs,
         progressbar_index,
-        black_out_nsfw,
-        censor=True,
         do_not_show_finished_images=False,
     ):
-        if not isinstance(imgs, list):
-            imgs = [imgs]
 
-        if censor and (DefConf.default_black_out_nsfw or black_out_nsfw):
+        if (GlobalConfig.default_black_out_nsfw):
             progressbar(async_task, progressbar_index, "Checking for NSFW content ...")
             imgs = default_censor(imgs)
 
@@ -173,10 +164,6 @@ def worker():
 
         current_progress = int(base_progress + (100 - preparation_steps) / float(all_steps) * steps)
 
-        if config.default_black_out_nsfw or async_task.black_out_nsfw:
-            progressbar(async_task, current_progress, "Checking for NSFW content ...")
-            imgs = default_censor(imgs)
-
         progressbar(async_task, current_progress, f"Saving image {current_task_id + 1}/{total_count} to system ...")
 
         img_paths = save_and_log(
@@ -207,6 +194,7 @@ def worker():
     @torch.no_grad()
     @torch.inference_mode()
     def handler(async_task: ImageGenerationSeed):
+        ip_adapter_manager = ip_adapter.IpaAdapterManagement()
         
         preparation_start_time = time.perf_counter()
         async_task.processing = True
@@ -226,17 +214,10 @@ def worker():
 
         use_style = len(async_task.style_selections) > 0
 
-        if async_task.base_model_name == async_task.refiner_model_name:
-            print(f"Refiner disabled because base model and refiner are same.")
-            async_task.refiner_model_name = None
+        
 
         current_progress = 0
-        if async_task.performance_selection == Performance.EXTREME_SPEED:
-            set_lcm_defaults(async_task, current_progress, advance_progress=True)
-        elif async_task.performance_selection == Performance.LIGHTNING:
-            set_lightning_defaults(async_task, current_progress, advance_progress=True)
-        elif async_task.performance_selection == Performance.HYPER_SD:
-            set_hyper_sd_defaults(async_task, current_progress, advance_progress=True)
+      
 
         print(f"[Parameters] Adaptive CFG = {async_task.adaptive_cfg}")
         print(f"[Parameters] CLIP Skip = {async_task.clip_skip}")
@@ -320,10 +301,9 @@ def worker():
         # Load or unload CNs
         progressbar(async_task, current_progress, "Loading control models ...")
         pipeline.refresh_controlnets([controlnet_canny_path, controlnet_cpds_path])
-        ip_adapter.load_ip_adapter(clip_vision_path, ip_negative_path, ip_adapter_path)
-        ip_adapter.load_ip_adapter(
-            clip_vision_path, ip_negative_path, ip_adapter_face_path
-        )
+
+        ip_adapter_manager.load_ip_adapter(clip_vision_path, ip_negative_path, ip_adapter_path)
+        ip_adapter_manager.load_ip_adapter(clip_vision_path, ip_negative_path, ip_adapter_face_path)
 
         async_task.steps, switch, width, height = apply_overrides(
             async_task, async_task.steps, height, width
