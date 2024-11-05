@@ -104,6 +104,14 @@ def resize_image(im, width, height, resize_mode=1):
 def get_shape_ceil(h, w):
     return math.ceil(((h * w) ** 0.5) / 64.0) * 64.0
 
+def round_to_64(x: float) -> int:
+    h = float(x)
+    h = h / 64.0
+    h = round(h)
+    h = int(h)
+    h = h * 64
+    return h
+
 
 def get_image_shape_ceil(im):
     H, W = im.shape[:2]

@@ -282,13 +282,6 @@ class BrownianTreeNoiseSamplerPatched:
         t0, t1 = transform(torch.as_tensor(sigma)), transform(torch.as_tensor(sigma_next))
         return tree(t0, t1) / (t1 - t0).abs().sqrt()
 
-def round_to_64(x: float) -> int:
-    h = float(x)
-    h = h / 64.0
-    h = round(h)
-    h = int(h)
-    h = h * 64
-    return h
 
 
 def patched_KSamplerX0Inpaint_forward(self, x, sigma, uncond, cond, cond_scale, denoise_mask, model_options={}, seed=None):
