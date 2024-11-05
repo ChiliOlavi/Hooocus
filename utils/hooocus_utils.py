@@ -104,44 +104,46 @@ class InpaintImputImage(BaseModel):
     image: Optional[numpy.ndarray] = Field(description="The image to inpaint")
     mask: Optional[numpy.ndarray] = Field(description="The mask to inpaint")
 
+class _BaseImageGenerationObject(BaseModel):
+    path_outputs: str = "./outputs"
+    
+    yields: list = []
+    results: list = []
+    patch_settings: dict[int, PatchSettings] = {}
+    
+    processing: bool = True
+    last_stop: bool = False
+    generate_image_grid: bool = False
+    read_wildcards_in_order: bool = False # Read wildcards in order
 
-class ImageGenerationSeed(BaseModel):
+class ImageGenerationSeed(_BaseImageGenerationObject):
 
     class Config:
         arbitrary_types_allowed = True
         orm_mode = True
 
-    path_outputs: str = "./outputs"
-    yields: list = []
-    results: list = []
-    last_stop: bool = False
-    processing: bool = True
-
-    generate_image_grid: bool = False
     prompt: str = "A funny cat"
     negative_prompt: str = ""
-    style_selections: list[str] = config.default_styles
     
-    performance_selection: str = ""
+    style_selections: list[str] = GLOBAL_CONFIG.default_styles
+    performance_selection: str = GLOBAL_CONFIG.default_performance
+    aspect_ratios_selection: str = GLOBAL_CONFIG.default_aspect_ratio
+    base_model_name: str = Field("model.safetensors", description="Base model name")
+    
     performance_loras: list = []
     original_steps: int = -1
     steps: int = -1
     
-
-    aspect_ratios_selection: str = Field(flags)
     image_number: int = Field(1, description="How many images to generate", ge=1)
     output_format: flags.LITERAL_OUTPUT_FORMATS = Field("png", description="Output format")
     
-    read_wildcards_in_order: bool = False # Read wildcards in order
     seed: int = random.randint(config.MIN_SEED, config.MAX_SEED)
     sharpness: float = Field(2.0, description="Sharpness", ge=0.0, le=30.0)
     cfg_scale: float = Field(7.0, description="Higher value means style is cleaner, vivider, and more artistic.", ge=1.0, le=30.0)
-    base_model_name: str = Field("model.safetensors", description="Base model name")
     refiner_model_name: Optional[str] = Field(None, description="Refiner model name")
     refiner_switch: float = Field(0.8, description="Refiner switch", ge=0.0, le=1.0)
     
-    loras: List[LoraTuple] = Field(config.DEFAULT_CONFIG.loras, description="LoRA settings")
-
+    loras: List[LoraTuple] = Field(config.GLOBAL_CONFIG.default_loras, description="LoRA settings")
 
     input_image_checkbox: bool = False
     current_tab: str = config.default_selected_image_input_tab_id
