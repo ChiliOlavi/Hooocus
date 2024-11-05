@@ -1,8 +1,8 @@
 {
-    "default_model": "juggernautXL_v8Rundiffusion.safetensors",
-    "default_refiner": "None",
-    "default_refiner_switch": 0.5,
-    "default_loras": [
+    "model": "juggernautXL_v8Rundiffusion.safetensors",
+    "refiner": -1,
+    "refiner_switch": 0.5,
+    "loras": [
         [
             true,
             "sd_xl_offset_example-lora_1.0.safetensors",
@@ -29,20 +29,20 @@
             1.0
         ]
     ],
-    "default_cfg_scale": 4.0,
-    "default_sample_sharpness": 2.0,
-    "default_sampler": "dpmpp_2m_sde_gpu",
-    "default_scheduler": "karras",
-    "default_performance": "Speed",
-    "default_prompt": "",
-    "default_prompt_negative": "",
-    "default_styles": [
+    "cfg_scale": 4.0,
+    "sample_sharpness": 2.0,
+    "sampler": "dpmpp_2m_sde_gpu",
+    "scheduler": "karras",
+    "performance": "Speed",
+    "prompt": "",
+    "prompt_negative": "",
+    "styles": [
         "Fooocus V2",
         "Fooocus Enhance",
         "Fooocus Sharp"
     ],
-    "default_aspect_ratio": "1152*896",
-    "default_overwrite_step": -1,
+    "aspect_ratio": "1152*896",
+    "overwrite_step": -1,
     "checkpoint_downloads": {
         "juggernautXL_v8Rundiffusion.safetensors": "https://huggingface.co/lllyasviel/fav_models/resolve/main/fav/juggernautXL_v8Rundiffusion.safetensors"
     },
