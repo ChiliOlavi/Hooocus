@@ -15,7 +15,7 @@ import copy
 import utils.launch as launch
 from extras.inpaint_mask import SAMOptions
 
-from modules.sdxl_styles import legal_style_names
+from utils.sdxl_prompt_expansion_utils import legal_style_names
 from modules.private_logger import get_current_html_path
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
