@@ -4,14 +4,15 @@ prepare_environment()
 from modules.async_worker import ImageTaskProcessor
 import ldm_patched.modules.model_management as model_management
 from h3_utils.config import ImageGenerationObject, EnhanceMaskCtrls
+from unavoided_global_hell.global_model_management import global_model_management
 
 import time
 
 def generate_image(task: ImageGenerationObject):
 
     try:
-        with model_management.interrupt_processing_mutex:
-            model_management.interrupt_processing = False
+        with global_model_management.interrupt_processing_mutex:
+            global_model_management.interrupt_processing = False
         
         print(task.refiner_model)
         imgProcessor = ImageTaskProcessor()
