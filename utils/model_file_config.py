@@ -143,6 +143,8 @@ class SAM_Files(Enum):
 
     
 class BaseControlNetTask(BaseModel):
+    ip_conds: Optional[List[Any]] = None
+    ip_unconds: Optional[List[Any]] = None
     stop: float = Field(0.5, ge=0, le=1)
     img: Optional[numpy.ndarray] = None
     weight: float = Field(1.0, ge=0, le=1)
