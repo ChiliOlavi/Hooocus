@@ -237,9 +237,14 @@ def calc_cond_uncond_batch(model, cond, uncond, x_in, timestep, model_options):
     del out_uncond_count
     return out_cond, out_uncond
 
-#The main sampling function shared by all the samplers
-#Returns denoised
-def sampling_function(model, x, timestep, uncond, cond, cond_scale, model_options={}, seed=None):
+
+# The self is here because it is a method of the CFGNoisePredictor class
+# to wich this function is passed as a patch
+def sampling_function(_self, model, x, timestep, uncond, cond, cond_scale, model_options={}, seed=None):
+        """The main sampling function shared by all the samplers
+        
+        Returns 
+            denoised"""
         if math.isclose(cond_scale, 1.0) and model_options.get("disable_cfg1_optimization", False) == False:
             uncond_ = None
         else:
