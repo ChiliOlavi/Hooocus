@@ -15,7 +15,7 @@ import hashlib
 from PIL import Image
 
 import utils.config
-import modules.sdxl_styles
+import utils.sdxl_prompt_expansion_utils
 from utils.flags import Performance
 
 LANCZOS = (Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS)
@@ -327,7 +327,7 @@ def extract_styles_from_prompt(prompt, negative_prompt):
     extracted = []
     applicable_styles = []
 
-    for style_name, (style_prompt, style_negative_prompt) in modules.sdxl_styles.styles.items():
+    for style_name, (style_prompt, style_negative_prompt) in utils.sdxl_prompt_expansion_utils.styles.items():
         applicable_styles.append(PromptStyle(name=style_name, prompt=style_prompt, negative_prompt=style_negative_prompt))
 
     real_prompt = ''
@@ -356,14 +356,14 @@ def extract_styles_from_prompt(prompt, negative_prompt):
     # add prompt expansion if not all styles could be resolved
     if prompt != '':
         if real_prompt != '':
-            extracted.append(modules.sdxl_styles.fooocus_expansion)
+            extracted.append(utils.sdxl_prompt_expansion_utils.fooocus_expansion)
         else:
             # find real_prompt when only prompt expansion is selected
             first_word = prompt.split(', ')[0]
             first_word_positions = [i for i in range(len(prompt)) if prompt.startswith(first_word, i)]
             if len(first_word_positions) > 1:
                 real_prompt = prompt[:first_word_positions[-1]]
-                extracted.append(modules.sdxl_styles.fooocus_expansion)
+                extracted.append(utils.sdxl_prompt_expansion_utils.fooocus_expansion)
                 if real_prompt.endswith(', '):
                     real_prompt = real_prompt[:-2]
 
@@ -409,6 +409,7 @@ def get_enabled_loras(loras: list, remove_none=True) -> list:
     return [(lora[1], lora[2]) for lora in loras if lora[0] and (lora[1] != 'None' if remove_none else True)]
 
 
+# OK
 def parse_lora_references_from_prompt(prompt: str, loras: List[Tuple[AnyStr, float]], loras_limit: int = 5,
                                       skip_file_check=False, prompt_cleanup=True, deduplicate_loras=True,
                                       lora_filenames=None) -> tuple[List[Tuple[AnyStr, float]], str]:
@@ -460,7 +461,7 @@ def parse_lora_references_from_prompt(prompt: str, loras: List[Tuple[AnyStr, flo
 
     return updated_loras[:loras_limit], cleaned_prompt
 
-
+# OK
 def remove_performance_lora(filenames: list, performance: Performance | None):
     loras_without_performance = filenames.copy()
 
