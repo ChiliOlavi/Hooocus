@@ -8,7 +8,7 @@ import ldm_patched.ldm.modules.attention
 import ldm_patched.ldm.modules.diffusionmodules.model
 import ldm_patched.ldm.modules.diffusionmodules.openaimodel
 import ldm_patched.ldm.modules.diffusionmodules.openaimodel
-import ldm_patched.modules.args_parser
+from h3_utils.config import LAUNCH_ARGS as args
 import ldm_patched.modules.model_base
 import ldm_patched.modules.model_management
 import ldm_patched.modules.model_patcher

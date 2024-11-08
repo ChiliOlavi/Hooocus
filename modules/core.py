@@ -17,7 +17,9 @@ from ldm_patched.modules.sample import prepare_mask
 from modules.lora import match_lora
 from modules.util import get_file_from_folder_list
 from ldm_patched.modules.lora import model_lora_keys_unet, model_lora_keys_clip
-from utils.config import path_embeddings
+from h3_utils.path_configs import FolderPathsConfig
+
+path_embeddings = FolderPathsConfig.path_embeddings
 from unavoided_global_vars import (
     opEmptyLatentImage,
     opVAEDecode,
@@ -219,7 +221,7 @@ VAE_approx_models = {}
 def get_previewer(model):
     global VAE_approx_models
 
-    from utils.config import path_vae_approx
+    from h3_utils.config import path_vae_approx
     is_sdxl = isinstance(model.model.latent_format, ldm_patched.modules.latent_formats.SDXL)
     vae_approx_filename = os.path.join(path_vae_approx, 'xlvaeapp.pth' if is_sdxl else 'vaeapp_sd15.pth')
 

@@ -29,7 +29,7 @@ import ldm_patched.modules.controlnet
 import ldm_patched.modules.clip_vision
 
 import ldm_patched.modules.model_management
-from ldm_patched.modules.args_parser import args
+from h3_utils.config import LAUNCH_ARGS as args
 
 import importlib
 

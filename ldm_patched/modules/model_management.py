@@ -1,3 +1,9 @@
+import os
+import sys
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(ROOT_DIR)
+
 import psutil
 from enum import Enum
 import ldm_patched.modules.utils
@@ -5,7 +11,7 @@ import torch
 import importlib.util
 import sys
 
-from utils.config import LAUNCH_ARGS, VramArgs
+from h3_utils.config import LAUNCH_ARGS
 
 args = LAUNCH_ARGS
 
@@ -37,7 +43,7 @@ if args.GeneralArgs.pytorch_deterministic:
     torch.use_deterministic_algorithms(True, warn_only=True)
 
 directml_enabled = False
-if args.GeneralArgs.directml is not None:
+if args.GeneralArgs.directml is not None and importlib.util.find_spec("torch_directml") is not None:
     import torch_directml
     directml_enabled = True
     device_index = args.directml

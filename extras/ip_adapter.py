@@ -12,7 +12,7 @@ from ldm_patched.modules.ops import manual_cast
 from extras.resampler import Resampler
 from modules.core import StableDiffusionModel, numpy_to_pytorch
 from modules.ops import use_patched_ops
-from utils.model_file_config import BaseControlNetTask
+from h3_utils.model_file_config import BaseControlNetTask
 
 
 SD_V12_CHANNELS = (
@@ -111,11 +111,13 @@ class IPAdapterModel(torch.nn.Module):
 
 
 class IpaAdapterManagement:
-    clip_vision: ldm_patched.modules.clip_vision.ClipVisionModel = None
-    ip_negative: torch.Tensor = None
-    ip_adapters: dict = {}
-    load_device: torch.device = None
-    offload_device: torch.device = None
+
+    def __init__(self):
+        self.clip_vision: ldm_patched.modules.clip_vision.ClipVisionModel = None
+        self.ip_negative: torch.Tensor = None
+        self.ip_adapters: dict = {}
+        self.load_device: torch.device = None
+        self.offload_device: torch.device = None
 
 
     def load_ip_adapter(self, clip_vision_path, ip_negative_path, ip_adapter_path):
@@ -123,8 +125,8 @@ class IpaAdapterManagement:
         if self.clip_vision is None and isinstance(clip_vision_path, str):
             self.clip_vision = ldm_patched.modules.clip_vision.load(clip_vision_path)
 
-        if ip_negative is None and isinstance(ip_negative_path, str):
-            ip_negative = sf.load_file(ip_negative_path)["data"]
+        if self.ip_negative is None and isinstance(ip_negative_path, str):
+            self.ip_negative = sf.load_file(ip_negative_path)["data"]
 
         if not isinstance(ip_adapter_path, str) or ip_adapter_path in self.ip_adapters:
             return

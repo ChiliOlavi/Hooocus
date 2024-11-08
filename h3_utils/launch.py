@@ -2,14 +2,16 @@ import os
 import ssl
 import sys
 import platform
-from utils import config
+
+from h3_utils import config
 from modules.hash_cache import init_cache, load_cache_from_file
 from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
 from modules.model_loader import load_file_from_url
-from utils.config import HOOOCUS_VERSION, GlobalEnv, LAUNCH_ARGS, DefaultConfigImageGen
-from utils.flags import LORA_FILENAMES, MODEL_FILENAMES
-from utils.path_configs import FolderPathsConfig
+from h3_utils.config import HOOOCUS_VERSION, GlobalEnv, LAUNCH_ARGS, DefaultConfigImageGen
+from h3_utils.flags import LORA_FILENAMES, MODEL_FILENAMES
+from h3_utils.path_configs import FolderPathsConfig
 
+from h3_utils.model_file_config import AllModelFiles
 
 args = LAUNCH_ARGS
 
@@ -29,7 +31,7 @@ def prepare_environment():
     torch_index_url = os.environ.get('TORCH_INDEX_URL', "https://download.pytorch.org/whl/cu121")
     torch_command = os.environ.get('TORCH_COMMAND',
                                    f"pip install torch==2.1.0 torchvision==0.16.0 --extra-index-url {torch_index_url}")
-    requirements_file = os.environ.get('REQS_FILE', "utils/requirements_versions.txt")
+    requirements_file = os.environ.get('REQS_FILE', "h3_utils/requirements_versions.txt")
 
     print(f"Python {sys.version}")
     print(f"Hooocus version: {HOOOCUS_VERSION}")
@@ -55,7 +57,8 @@ def prepare_environment():
     if GlobalEnv.REINSTALL_ALL or not requirements_met(requirements_file):
         run_pip(f"install -r \"{requirements_file}\"", "requirements")
 
-    DefaultConfigImageGen.base_model_name, FolderPathsConfig.path_checkpoints = download_models(
+    
+    """ DefaultConfigImageGen.base_model_name, FolderPathsConfig.path_checkpoints = download_models(
         DefaultConfigImageGen.base_model_name,
         DefaultConfigImageGen.previous_default_models,
         FolderPathsConfig.path_checkpoints,
@@ -63,7 +66,7 @@ def prepare_environment():
         FolderPathsConfig.path_loras,
         FolderPathsConfig.path_vae,
         args=LAUNCH_ARGS,
-    )
+    ) """
 
     if args.GeneralArgs.gpu_device_id is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu_device_id)
@@ -126,6 +129,7 @@ def download_models(default_model, previous_default_models, checkpoint_downloads
                     default_model = alternative_model_name
                     break
 
+    #for file_name, url in checkpoint_downloads.items():
     for file_name, url in checkpoint_downloads.items():
         model_dir = os.path.dirname(get_file_from_folder_list(file_name, FolderPathsConfig.path_checkpoints))
         load_file_from_url(url=url, model_dir=model_dir, file_name=file_name)

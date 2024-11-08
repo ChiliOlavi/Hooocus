@@ -1,6 +1,6 @@
 {
     "model": "juggernautXL_v8Rundiffusion.safetensors",
-    "refiner": -1,
+    "refiner": false,
     "refiner_switch": 0.5,
     "loras": [
         [
@@ -42,7 +42,7 @@
         "Fooocus Sharp"
     ],
     "aspect_ratio": "1152*896",
-    "overwrite_step": -1,
+    "overwrite_step": false,
     "checkpoint_downloads": {
         "juggernautXL_v8Rundiffusion.safetensors": "https://huggingface.co/lllyasviel/fav_models/resolve/main/fav/juggernautXL_v8Rundiffusion.safetensors"
     },

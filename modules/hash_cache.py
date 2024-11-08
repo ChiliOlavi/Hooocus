@@ -4,9 +4,10 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 
-import utils.launch_arguments as launch_arguments
+from h3_utils.config import LAUNCH_ARGS, FilePathConfig
+from h3_utils.path_configs import FolderPathsConfig
+
 from modules.util import sha256, HASH_SHA256_LENGTH, get_file_from_folder_list
-from utils.consts import HASH_CACHE_PATH
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 sys.path.append(parent_dir)
@@ -21,8 +22,7 @@ def sha256_from_cache(filepath) -> dict:
     return hash_cache_obj
 
 
-def load_cache_from_file(hash_cache_path=HASH_CACHE_PATH) -> dict:
-
+def load_cache_from_file(hash_cache_path=FilePathConfig.hash_cache_path) -> dict:
     try:
         
         if os.path.exists(hash_cache_path):
@@ -44,7 +44,7 @@ def load_cache_from_file(hash_cache_path=HASH_CACHE_PATH) -> dict:
 
     return hash_cache
 
-def overwrite_old_cache(new_cache, hash_cache_path=HASH_CACHE_PATH):
+def overwrite_old_cache(new_cache, hash_cache_path=FilePathConfig.hash_cache_path):
     try:
         with open(hash_cache_path, 'w') as fp:
             json.dump(new_cache, fp, indent=2, ensure_ascii=False)

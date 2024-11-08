@@ -14,9 +14,9 @@ import hashlib
 
 from PIL import Image
 
-import utils.config
-import utils.sdxl_prompt_expansion_utils
-from utils.flags import Performance
+import h3_utils.config
+import h3_utils.sdxl_prompt_expansion_utils
+from h3_utils.flags import Performance
 
 LANCZOS = (Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS)
 
@@ -327,7 +327,7 @@ def extract_styles_from_prompt(prompt, negative_prompt):
     extracted = []
     applicable_styles = []
 
-    for style_name, (style_prompt, style_negative_prompt) in utils.sdxl_prompt_expansion_utils.styles.items():
+    for style_name, (style_prompt, style_negative_prompt) in h3_utils.sdxl_prompt_expansion_utils.styles.items():
         applicable_styles.append(PromptStyle(name=style_name, prompt=style_prompt, negative_prompt=style_negative_prompt))
 
     real_prompt = ''
@@ -356,14 +356,14 @@ def extract_styles_from_prompt(prompt, negative_prompt):
     # add prompt expansion if not all styles could be resolved
     if prompt != '':
         if real_prompt != '':
-            extracted.append(utils.sdxl_prompt_expansion_utils.fooocus_expansion)
+            extracted.append(h3_utils.sdxl_prompt_expansion_utils.fooocus_expansion)
         else:
             # find real_prompt when only prompt expansion is selected
             first_word = prompt.split(', ')[0]
             first_word_positions = [i for i in range(len(prompt)) if prompt.startswith(first_word, i)]
             if len(first_word_positions) > 1:
                 real_prompt = prompt[:first_word_positions[-1]]
-                extracted.append(utils.sdxl_prompt_expansion_utils.fooocus_expansion)
+                extracted.append(h3_utils.sdxl_prompt_expansion_utils.fooocus_expansion)
                 if real_prompt.endswith(', '):
                     real_prompt = real_prompt[:-2]
 
@@ -491,7 +491,7 @@ def cleanup_prompt(prompt):
 
 
 def apply_wildcards(wildcard_text, rng, i, read_wildcards_in_order) -> str:
-    for _ in range(utils.config.wildcards_max_bfs_depth):
+    for _ in range(h3_utils.config.wildcards_max_bfs_depth):
         placeholders = re.findall(r'__([\w-]+)__', wildcard_text)
         if len(placeholders) == 0:
             return wildcard_text
@@ -499,8 +499,8 @@ def apply_wildcards(wildcard_text, rng, i, read_wildcards_in_order) -> str:
         print(f'[Wildcards] processing: {wildcard_text}')
         for placeholder in placeholders:
             try:
-                matches = [x for x in utils.config.wildcard_filenames if os.path.splitext(os.path.basename(x))[0] == placeholder]
-                words = open(os.path.join(utils.config.path_wildcards, matches[0]), encoding='utf-8').read().splitlines()
+                matches = [x for x in h3_utils.config.wildcard_filenames if os.path.splitext(os.path.basename(x))[0] == placeholder]
+                words = open(os.path.join(h3_utils.config.path_wildcards, matches[0]), encoding='utf-8').read().splitlines()
                 words = [x for x in words if x != '']
                 assert len(words) > 0
                 if read_wildcards_in_order:

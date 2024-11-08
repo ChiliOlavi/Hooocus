@@ -24,7 +24,7 @@ from extras.censor import default_censor
 from modules.inpaint_worker import InpaintWorker
 from modules.upscaler import perform_upscale
 from unavoided_global_vars import PatchSettings
-from utils.model_file_config import (
+from h3_utils.model_file_config import (
     UpscaleModel,
     InpaintModelFiles,
     ControlNetTasks,
@@ -37,11 +37,11 @@ from utils.model_file_config import (
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import utils.config as config
-import utils.flags as flags
-from utils.logging_util import LoggingUtil
-from utils.sdxl_prompt_expansion_utils import apply_arrays, apply_style, fooocus_expansion, get_random_style
-from utils.flags import LORA_FILENAMES, Overrides, Performance, Steps
+import h3_utils.config as config
+import h3_utils.flags as flags
+from h3_utils.logging_util import LoggingUtil
+from h3_utils.sdxl_prompt_expansion_utils import apply_arrays, apply_style, fooocus_expansion, get_random_style
+from h3_utils.flags import LORA_FILENAMES, Overrides, Performance, Steps
 
 import extras.ip_adapter as ip_adapter
 
@@ -72,8 +72,7 @@ patch_all()
 GlobalConfig = config.LAUNCH_ARGS
 GeneralCongig = GlobalConfig.GeneralArgs
 
-logger = LoggingUtil().get_logger()
-logger.name = "ImageTaskProcessor"
+logger = LoggingUtil(name="ImageTaskProcessor").get_logger()
 
 class EarlyReturnException(BaseException):
     pass
@@ -96,7 +95,8 @@ class ImageTaskProcessor:
 
         logger.info(f"Initialized ImageTaskProcessor with PID {self.pid}")
 
-    def initialize_current_task(self):
+    def initialize_current_task(self, new_task: config.ImageGenerationObject = None):
+        self.generation_task = new_task
         self.patch_settings = PatchSettings()
         self.inpaint_worker: InpaintWorker = None
 
@@ -119,6 +119,8 @@ class ImageTaskProcessor:
         self.processing = False
         self.processing_status = False
 
+        self.skip_prompt_processing = False
+        self.use_synthetic_refiner = False
         self.use_prompt_expansion = False
         self.use_styles = False
 
@@ -163,7 +165,7 @@ class ImageTaskProcessor:
         return imgs
 
     # OK
-    async def process_tasklet(self, prepared_task: config.TaskletObject):
+    def process_tasklet(self, prepared_task: config.TaskletObject):
         parent_task: config.ImageGenerationObject = self.generation_task
         """Processes a single image generation tasklet."""
 
@@ -183,7 +185,7 @@ class ImageTaskProcessor:
                     f'Sampling step {self.step + 1}/{self.all_steps}, image current_task_id + 1/total_count ...', y)])
 
         if 'cn' in self.goals:
-            prepared_task.positive_cond, prepared_task.negative_cond = await self.get_conditions_from_input_img_controlnet(prepared_task.positive_cond, prepared_task.negative_cond)
+            prepared_task.positive_cond, prepared_task.negative_cond =  self.get_conditions_from_input_img_controlnet(prepared_task.positive_cond, prepared_task.negative_cond)
 
         imgs = self.pipeline.process_diffusion(
             # Shared parameters of all tasklets
@@ -225,7 +227,7 @@ class ImageTaskProcessor:
         return imgs, img_paths
 
     # OK
-    async def cleanup_vars(self, vars: list) -> None:
+    def cleanup_vars(self, vars: list) -> None:
         """Cleans up variables after processing a task."""
         for var in vars:
             if isinstance(var, np.ndarray):
@@ -241,7 +243,7 @@ class ImageTaskProcessor:
             ldm_patched.modules.model_management.interrupt_current_processing()
 
     # OK
-    async def get_conditions_from_input_img_controlnet(self, positive_cond, negative_cond):
+    def get_conditions_from_input_img_controlnet(self, positive_cond, negative_cond):
         if self.generation_task.controlnet_tasks:
             for controlnet_task in self.generation_task.controlnet_tasks:
                 if controlnet_task.name [ControlNetTasks.CPDS.name, ControlNetTasks.PyraCanny.name]:
@@ -301,8 +303,9 @@ class ImageTaskProcessor:
     # OK
     def prepare_loras(self):
         """Prepares and returns the loras for the task."""
+        task: config.ImageGenerationObject = self.generation_task
         updated_lora_filenames = remove_performance_lora(LORA_FILENAMES, self.generation_task.performance_selection)
-        loras, prompt = parse_lora_references_from_prompt(prompt, self.generation_task.loras, flags.max_lora_number, lora_filenames=updated_lora_filenames)
+        loras, prompt = parse_lora_references_from_prompt(task.prompt, task.loras, flags.max_lora_number, lora_filenames=updated_lora_filenames)
         loras += self.generation_task.performance_loras
         self.generation_task.loras = loras
         return 
@@ -439,18 +442,18 @@ class ImageTaskProcessor:
         """Processes all tasks in the generation queue."""
         time.sleep(0.01)
         logger.info(f"Processing all tasks ...")
-        while self.generation_tasks:
-            self.process_single_task()
+        for task in self.generation_tasks:
+            self.process_single_task(task)
 
     # OK
-    async def prepare_task_for_processing(self):
+    def prepare_task_for_processing(self, task: config.ImageGenerationObject):
         """Processes a single task from the generation queue."""
         self.preparation_start_time = time.perf_counter()
-        task: config.ImageGenerationObject = self.generation_tasks.pop(0)
-        self.generation_task = task
-        await apply_patch_settings(self.pid, task)
-        if task.use_image_input:
-            await self.prepare_image_inputs()
+        self.initialize_current_task(task)
+
+        apply_patch_settings(self.pid, task)
+        if task.input_image:
+             self.prepare_image_inputs()
 
         self.pipeline.refresh_controlnets([self.controlnet_pyracanny_path, self.controlnet_cpds_path])
         self.ip_adapter.load_ip_adapter(self.clip_vision_path, self.ip_negative_path, self.ip_adapter_path)
@@ -502,7 +505,7 @@ class ImageTaskProcessor:
             if task.developer_options.debugging_cn_preprocessor:
                 return
 
-        await self.patch_freeu_to_core()
+        self.patch_freeu_to_core()
 
         second_overrides: config.Overrides = self.get_overrides(task.steps, task.height, task.width)
         task.steps = second_overrides.steps
@@ -553,7 +556,7 @@ class ImageTaskProcessor:
         return True
 
     # OK
-    async def patch_freeu_to_core(self):
+    def patch_freeu_to_core(self):
         if self.generation_task.freeu_controls:
             logger.info(f"FreeU is enabled!")
         self.pipeline.final_unet = apply_freeu(
@@ -564,17 +567,17 @@ class ImageTaskProcessor:
             self.generation_task.freeu_controls.freeu_s2,
         )
 
-    async def process_single_task(self):
+    def process_single_task(self, task):
+        self.prepare_task_for_processing(task)
         task: config.ImageGenerationObject = self.generation_task 
         try:
             self.processing = True
-            await self.prepare_task_for_processing()
             for tasklet in self.tasks:
-                imgs, img_paths = await self.process_tasklet(tasklet)
+                imgs, img_paths =  self.process_tasklet(tasklet)
                 logger.info(f"Tasklet processed.")
                 logger.info(f"[{tasklet}, {imgs}, {img_paths}]")
 
-            self.generate_image_wall_if_needed(task)
+            #self.generate_image_wall_if_needed(task)
             self.yields.append(["finish", self.results])
             self.pipeline.prepare_text_encoder(async_call=True)
         except Exception as e:
@@ -586,9 +589,11 @@ class ImageTaskProcessor:
 
     def generate_image_wall_if_needed(self, task):
         """Generates an image wall if the task requires it."""
-        if task.developer_options.generate_grid and len(self.results) > 2:
+        """ if task.developer_options.generate_grid and len(self.results) > 2:
             wall = build_image_wall(task.results)
-            task.results.append(wall)
+            task.results.append(wall) """
+        
+        raise NotImplementedError("generate_image_wall_if_needed is not implemented yet.")
 
     # OK
     def cleanup_after_task(self):
@@ -615,7 +620,7 @@ class ImageTaskProcessor:
             self.processing_status = False
 
     # OK
-    async def update_progress(self, status: str = None, step: int = 1):
+    def update_progress(self, status: str = None, step: int = 1):
         """ self.current_progress += 1
         percentage = self.current_progress / self.total_progress * 100
         # Inspiration for a print that overwrites itself
@@ -647,7 +652,7 @@ class ImageTaskProcessor:
     # start_worker_thread()
 
     # OK
-    async def prepare_image_inputs(self):
+    def prepare_image_inputs(self):
         ip_mode = self.generation_task.image_input_mode
         inpaint_options = self.generation_task.inpaint_options
         task: config.ImageGenerationObject = self.generation_task
@@ -740,10 +745,17 @@ class ImageTaskProcessor:
     def get_overrides(self, steps: int, height: int, width: int) -> Overrides:
         task: config.ImageGenerationObject = self.generation_task
         overrides = task.overwrite_controls
+        if not overrides:
+            return Overrides(
+                steps=steps, 
+                switch=task.refiner_switch, 
+                width=width, 
+                height=height
+                )
 
         if overrides.overwrite_step > 0:
             steps = overrides.overwrite_step
-        switch = int(round(steps * self.refiner_switch))
+        switch = int(round(steps * task.refiner_switch))
         if overrides.overwrite_switch > 0:
             switch = overrides.overwrite_switch
         if overrides.overwrite_width > 0:

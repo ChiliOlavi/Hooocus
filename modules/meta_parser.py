@@ -5,11 +5,11 @@ from pathlib import Path
 
 from PIL import Image
 
-import utils.config
-import utils.sdxl_prompt_expansion_utils
-from utils.flags import Performance, Steps
-from utils.flags import SAMPLERS, CIVITAI_NO_KARRAS
-from utils.config import HOOOCUS_VERSION, METADATA_SCHEME
+import h3_utils.config
+import h3_utils.sdxl_prompt_expansion_utils
+from h3_utils.flags import Performance, Steps
+from h3_utils.flags import SAMPLERS, CIVITAI_NO_KARRAS
+from h3_utils.config import HOOOCUS_VERSION, METADATA_SCHEME
 from modules.hash_cache import sha256_from_cache
 from modules.util import quote, unquote, extract_styles_from_prompt, is_json, get_file_from_folder_list
 
@@ -65,7 +65,7 @@ def load_parameter_button_click(raw_metadata: dict | str, is_generating: bool, i
         performance = Performance(performance)
         performance_filename = performance.lora_filename()
 
-    for i in range(utils.config.default_max_lora_number):
+    for i in range(h3_utils.config.default_max_lora_number):
         get_lora(f'lora_combined_{i + 1}', f'LoRA {i + 1}', loaded_parameter_dict, results, performance_filename)
 
     return results
@@ -107,7 +107,7 @@ def get_image_number(key: str, fallback: str | None, source_dict: dict, results:
         h = source_dict.get(key, source_dict.get(fallback, default))
         assert h is not None
         h = int(h)
-        h = min(h, utils.config.default_max_image_number)
+        h = min(h, h3_utils.config.default_max_image_number)
         results.append(h)
     except:
         results.append(1)
@@ -133,8 +133,8 @@ def get_resolution(key: str, fallback: str | None, source_dict: dict, results: l
     try:
         h = source_dict.get(key, source_dict.get(fallback, default))
         width, height = eval(h)
-        formatted = utils.config.add_ratio(f'{width}*{height}')
-        if formatted in utils.config.available_aspect_ratios_labels:
+        formatted = h3_utils.config.add_ratio(f'{width}*{height}')
+        if formatted in h3_utils.config.available_aspect_ratios_labels:
             results.append(formatted)
             results.append(-1)
             results.append(-1)
@@ -181,12 +181,12 @@ def get_inpaint_method(key: str, fallback: str | None, source_dict: dict, result
         h = source_dict.get(key, source_dict.get(fallback, default))
         assert isinstance(h, str) and h in modules.flags.inpaint_options
         results.append(h)
-        for i in range(utils.config.default_enhance_tabs):
+        for i in range(h3_utils.config.default_enhance_tabs):
             results.append(h)
         return h
     except:
         results.append(gr.update())
-        for i in range(utils.config.default_enhance_tabs):
+        for i in range(h3_utils.config.default_enhance_tabs):
             results.append(gr.update())
 
 
@@ -250,9 +250,9 @@ def parse_meta_from_preset(preset_content):
     preset_prepared = {}
     items = preset_content
 
-    for settings_key, meta_key in utils.config.possible_preset_keys.items():
+    for settings_key, meta_key in h3_utils.config.possible_preset_keys.items():
         if settings_key == "default_loras":
-            loras = getattr(utils.config, settings_key)
+            loras = getattr(h3_utils.config, settings_key)
             if settings_key in items:
                 loras = items[settings_key]
             for index, lora in enumerate(loras[:modules.config.default_max_lora_number]):
@@ -262,12 +262,12 @@ def parse_meta_from_preset(preset_content):
                 default_aspect_ratio = items[settings_key]
                 width, height = default_aspect_ratio.split('*')
             else:
-                default_aspect_ratio = getattr(utils.config, settings_key)
+                default_aspect_ratio = getattr(h3_utils.config, settings_key)
                 width, height = default_aspect_ratio.split('×')
                 height = height[:height.index(" ")]
             preset_prepared[meta_key] = (width, height)
         else:
-            preset_prepared[meta_key] = items[settings_key] if settings_key in items and items[settings_key] is not None else getattr(utils.config, settings_key)
+            preset_prepared[meta_key] = items[settings_key] if settings_key in items and items[settings_key] is not None else getattr(h3_utils.config, settings_key)
 
         if settings_key == "default_styles" or settings_key == "default_aspect_ratio":
             preset_prepared[meta_key] = str(preset_prepared[meta_key])
@@ -290,7 +290,8 @@ class MetadataParser(ABC):
         self.vae_name: str = ''
 
     @abstractmethod
-    def get_scheme(self) -> MetadataScheme:
+    def get_scheme(self) -> str:
+        
         raise NotImplementedError
 
     @abstractmethod
@@ -310,23 +311,23 @@ class MetadataParser(ABC):
         self.steps = steps
         self.base_model_name = Path(base_model_name).stem
 
-        base_model_path = get_file_from_folder_list(base_model_name, utils.config.paths_checkpoints)
+        base_model_path = get_file_from_folder_list(base_model_name, h3_utils.config.paths_checkpoints)
         self.base_model_hash = sha256_from_cache(base_model_path)
 
         if refiner_model_name not in ['', 'None']:
             self.refiner_model_name = Path(refiner_model_name).stem
-            refiner_model_path = get_file_from_folder_list(refiner_model_name, utils.config.paths_checkpoints)
+            refiner_model_path = get_file_from_folder_list(refiner_model_name, h3_utils.config.paths_checkpoints)
             self.refiner_model_hash = sha256_from_cache(refiner_model_path)
 
         self.loras = []
         for (lora_name, lora_weight) in loras:
             if lora_name != 'None':
-                lora_path = get_file_from_folder_list(lora_name, utils.config.paths_loras)
+                lora_path = get_file_from_folder_list(lora_name, h3_utils.config.paths_loras)
                 lora_hash = sha256_from_cache(lora_path)
                 self.loras.append((Path(lora_name).stem, lora_weight, lora_hash))
         self.vae_name = Path(vae_name).stem
 
-
+""" 
 class A1111MetadataParser(MetadataParser):
     def get_scheme(self) -> MetadataScheme:
         return MetadataScheme.A1111
@@ -406,8 +407,8 @@ class A1111MetadataParser(MetadataParser):
         if 'raw_prompt' in data:
             data['prompt'] = data['raw_prompt']
             raw_prompt = data['raw_prompt'].replace("\n", ', ')
-            if metadata_prompt != raw_prompt and utils.sdxl_prompt_expansion_utils.fooocus_expansion not in found_styles:
-                found_styles.append(utils.sdxl_prompt_expansion_utils.fooocus_expansion)
+            if metadata_prompt != raw_prompt and h3_utils.sdxl_prompt_expansion_utils.fooocus_expansion not in found_styles:
+                found_styles.append(h3_utils.sdxl_prompt_expansion_utils.fooocus_expansion)
 
         if 'raw_negative_prompt' in data:
             data['negative_prompt'] = data['raw_negative_prompt']
@@ -432,9 +433,9 @@ class A1111MetadataParser(MetadataParser):
         for key in ['base_model', 'refiner_model', 'vae']:
             if key in data:
                 if key == 'vae':
-                    self.add_extension_to_filename(data, utils.config.vae_filenames, 'vae')
+                    self.add_extension_to_filename(data, h3_utils.config.vae_filenames, 'vae')
                 else:
-                    self.add_extension_to_filename(data, utils.config.model_filenames, key)
+                    self.add_extension_to_filename(data, h3_utils.config.model_filenames, key)
 
         lora_data = ''
         if 'lora_weights' in data and data['lora_weights'] != '':
@@ -447,7 +448,7 @@ class A1111MetadataParser(MetadataParser):
                 lora_split = lora.split(': ')
                 lora_name = lora_split[0]
                 lora_weight = lora_split[2] if len(lora_split) == 3 else lora_split[1]
-                for filename in utils.config.lora_filenames:
+                for filename in h3_utils.config.lora_filenames:
                     path = Path(filename)
                     if lora_name == path.stem:
                         data[f'lora_combined_{li + 1}'] = f'{filename} : {lora_weight}'
@@ -511,8 +512,8 @@ class A1111MetadataParser(MetadataParser):
 
         generation_params[self.fooocus_to_a1111['version']] = data['version']
 
-        if utils.config.metadata_created_by != '':
-            generation_params[self.fooocus_to_a1111['created_by']] = utils.config.metadata_created_by
+        if h3_utils.config.metadata_created_by != '':
+            generation_params[self.fooocus_to_a1111['created_by']] = h3_utils.config.metadata_created_by
 
         generation_params_text = ", ".join(
             [k if k == v else f'{k}: {quote(v)}' for k, v in generation_params.items() if
@@ -530,21 +531,21 @@ class A1111MetadataParser(MetadataParser):
                 data[key] = filename
                 break
 
-
+ """
 class HooocusMetadataParser(MetadataParser):
-    def get_scheme(self) -> MetadataScheme:
-        return MetadataScheme.FOOOCUS
+    def get_scheme(self) -> str:
+        return METADATA_SCHEME
 
     def to_json(self, metadata: dict) -> dict:
         for key, value in metadata.items():
             if value in ['', 'None']:
                 continue
             if key in ['base_model', 'refiner_model']:
-                metadata[key] = self.replace_value_with_filename(key, value, utils.config.model_filenames)
+                metadata[key] = self.replace_value_with_filename(key, value, h3_utils.config.model_filenames)
             elif key.startswith('lora_combined_'):
-                metadata[key] = self.replace_value_with_filename(key, value, utils.config.lora_filenames)
+                metadata[key] = self.replace_value_with_filename(key, value, h3_utils.config.lora_filenames)
             elif key == 'vae':
-                metadata[key] = self.replace_value_with_filename(key, value, utils.config.vae_filenames)
+                metadata[key] = self.replace_value_with_filename(key, value, h3_utils.config.vae_filenames)
             else:
                 continue
 
@@ -574,8 +575,8 @@ class HooocusMetadataParser(MetadataParser):
         res['vae'] = self.vae_name
         res['loras'] = self.loras
 
-        if utils.config.metadata_created_by != '':
-            res['created_by'] = utils.config.metadata_created_by
+        if h3_utils.config.metadata_created_by != '':
+            res['created_by'] = h3_utils.config.metadata_created_by
 
         return json.dumps(dict(sorted(res.items())))
 
@@ -594,7 +595,7 @@ class HooocusMetadataParser(MetadataParser):
 
 
 
-def read_info_from_image(file) -> tuple[str | None, MetadataScheme | None]:
+def read_info_from_image(file) -> tuple[str | None, str | None]:
     items = (file.info or {}).copy()
 
     parameters = items.pop('parameters', None)

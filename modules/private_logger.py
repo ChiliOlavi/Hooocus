@@ -1,12 +1,12 @@
 import os
-import utils.launch_arguments as launch_arguments
-import utils.config
+from h3_utils.config import LAUNCH_ARGS as launch_arguments
+import h3_utils.config
 import json
 import urllib.parse
 
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-from utils.flags import OutputFormat
+from h3_utils.flags import OutputFormat
 from modules.meta_parser import MetadataParser, get_exif
 from modules.util import generate_temp_filename
 
@@ -14,7 +14,7 @@ log_cache = {}
 
 
 def get_current_html_path(output_format=None, path_outputs="./outputs") -> str:
-    output_format = output_format if output_format else utils.config.default_output_format
+    output_format = output_format if output_format else h3_utils.config.default_output_format
     date_string, local_temp_filename, only_name = generate_temp_filename(folder=path_outputs,
                                                                          extension=output_format)
     html_name = os.path.join(os.path.dirname(local_temp_filename), 'log.html')
@@ -22,7 +22,7 @@ def get_current_html_path(output_format=None, path_outputs="./outputs") -> str:
 
 
 def log(img, path_outputs, metadata, metadata_parser: MetadataParser | None = None, output_format=None, task=None, persist_image=True) -> str:
-    output_format = output_format if output_format else utils.config.default_output_format
+    output_format = output_format if output_format else h3_utils.config.default_output_format
     date_string, local_temp_filename, only_name = generate_temp_filename(folder=path_outputs, extension=output_format)
     os.makedirs(os.path.dirname(local_temp_filename), exist_ok=True)
 

@@ -2,7 +2,8 @@ import torch
 from PIL import Image
 import struct
 import numpy as np
-from ldm_patched.modules.args_parser import args, LatentPreviewMethod
+from h3_utils.config import LAUNCH_ARGS as args
+from h3_utils.flags import LatentPreviewMethod
 from ldm_patched.taesd.taesd import TAESD
 import ldm_patched.utils.path_utils
 import ldm_patched.modules.utils

@@ -8,8 +8,9 @@ import torch.nn as nn
 
 import ldm_patched.modules.model_management
 from ldm_patched.modules.model_patcher import ModelPatcher
-from utils.config import path_vae_approx
+from h3_utils.path_configs import FolderPathsConfig
 
+path_vae_approx = FolderPathsConfig.path_vae_approx
 
 class ResBlock(nn.Module):
     """Block with residuals"""

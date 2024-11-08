@@ -9,6 +9,9 @@ import logging
 import importlib.metadata
 import packaging.version
 from packaging.requirements import Requirement
+from h3_utils.logging_util import LoggingUtil
+
+log = LoggingUtil().get_logger()
 
 logging.getLogger("torch.distributed.nn").setLevel(logging.ERROR)  # sshh...
 logging.getLogger("xformers").addFilter(lambda record: 'A matching Triton is not available' not in record.getMessage())
@@ -76,6 +79,9 @@ def run_pip(command, desc=None, live=default_command_live):
 
 
 def requirements_met(requirements_file):
+    if not os.path.exists(requirements_file):
+        log.error(f"Requirements file {requirements_file} not found.")
+        return False
     with open(requirements_file, "r", encoding="utf8") as file:
         for line in file:
             line = line.strip()

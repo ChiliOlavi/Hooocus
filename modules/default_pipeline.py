@@ -2,14 +2,14 @@ import modules.core as core
 import os
 import sys
 
-from utils import config
-from utils.path_configs import FolderPathsConfig
+from h3_utils import config
+from h3_utils.path_configs import FolderPathsConfig
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import torch
 import modules.patch
-import utils.config
-import utils.flags
+import h3_utils.config
+import h3_utils.flags
 import ldm_patched.modules.model_management
 import ldm_patched.modules.latent_formats
 import modules.inpaint_worker
@@ -19,9 +19,9 @@ from extras.expansion import FooocusExpansion
 from ldm_patched.modules.model_base import SDXL, SDXLRefiner
 from modules.sample_hijack import clip_separate
 from modules.util import get_file_from_folder_list, get_enabled_loras
-from utils.config import LAUNCH_ARGS
+from h3_utils.config import LAUNCH_ARGS
 
-from utils.logging_util import LoggingUtil
+from h3_utils.logging_util import LoggingUtil
 
 logger = LoggingUtil().get_logger()
 logger.name = 'default_pipeline'
@@ -51,7 +51,7 @@ class DefaultPipeline:
 
     @torch.no_grad()
     @torch.inference_mode()
-    async def refresh_controlnets (self, model_paths):
+    def refresh_controlnets (self, model_paths):
         logger.debug(f'Refreshing ControlNets: {model_paths}')
         cache = {}
         for p in model_paths:
@@ -97,7 +97,7 @@ class DefaultPipeline:
             print(f'Refiner unloaded.')
             return
         
-        filename = get_file_from_folder_list(name, FolderPathsConfig.path_checkpoints.value)
+        filename = get_file_from_folder_list(name, FolderPathsConfig.path_checkpoints)
         
         if self.model_refiner.filename == filename:
             return

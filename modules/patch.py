@@ -20,11 +20,11 @@ import ldm_patched.modules.sd
 import ldm_patched.controlnet.cldm
 import ldm_patched.modules.model_patcher
 import ldm_patched.modules.samplers
-import ldm_patched.modules.args_parser
+from h3_utils.config import LAUNCH_ARGS as args
 import warnings
 import safetensors.torch
 from modules.util import round_to_64
-from utils.config import LAUNCH_ARGS
+from h3_utils.config import LAUNCH_ARGS
 
 from ldm_patched.modules.samplers import calc_cond_uncond_batch
 from ldm_patched.k_diffusion.sampling import BatchedBrownianTree

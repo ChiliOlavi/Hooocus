@@ -1,5 +1,4 @@
-from ast import Dict
-from typing import Optional
+from typing import Optional, Dict
 
 from pydantic import BaseModel
 
@@ -7,9 +6,15 @@ from ldm_patched.contrib.external import VAEDecode, EmptyLatentImage, VAEEncode,
     ControlNetApplyAdvanced
 from ldm_patched.contrib.external_freelunch import FreeU_V2
 from ldm_patched.contrib.external_model_advanced import ModelSamplingDiscrete, ModelSamplingContinuousEDM
-from utils.config import ImageGenerationObject
+from h3_utils.config import ImageGenerationObject
+
+from h3_utils.logging_util import LoggingUtil
+log = LoggingUtil("GlobalVarManager").get_logger()
 
 class PatchSettings(BaseModel):
+    class Config:
+        orm_mode = True
+
     sharpness: float = 2.0
     adm_scaler_end: float = 0.3
     positive_adm_scale: float = 1.5 
@@ -44,13 +49,14 @@ opModelSamplingDiscrete = ModelSamplingDiscrete()
 opModelSamplingContinuousEDM = ModelSamplingContinuousEDM()
 
 
-def apply_patch_settings(task: ImageGenerationObject, pid: int) -> None:
+def apply_patch_settings(pid: int, task: ImageGenerationObject) -> None:
     """Apply patch settings to the global caution settings."""
+    log.warning(f"Applying patch settings for pid {pid}")
     patch_settings_GLOBAL_CAUTION[pid] = PatchSettings(
-        task.sample_sharpness,
-        task.adm_scaler_end,
-        task.adm_scaler_positive,
-        task.adm_scaler_negative,
-        task.controlnet_softness,
-        task.adaptive_cfg,
+        sample_sharpness = task.sample_sharpness,
+        adm_scaler_end = task.adm_scaler_end,
+        adm_scaler_positive = task.adm_scaler_positive,
+        adm_scaler_negative = task.adm_scaler_negative,
+        controlnet_softness = task.controlnet_softness,
+        adaptive_cfg = task.adaptive_cfg,
     )

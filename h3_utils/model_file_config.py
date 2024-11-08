@@ -7,13 +7,13 @@ from pydantic import BaseModel, Field
 from pydantic import BaseModel
 
 from modules.model_loader import load_file_from_url
-from utils.path_configs import FolderPathsConfig
-from utils.flags import PerformanceLoRA
+from h3_utils.path_configs import FolderPathsConfig
+from h3_utils.flags import PerformanceLoRA
 
 
 class _BaseModelFile(BaseModel):
-    model_path_basename: str
-    model_name: str
+    model_path_basename: str = None
+    nameof_model: str = None
     model_url: str = None
     model_path_folder: str = None
 
@@ -21,19 +21,20 @@ class _BaseModelFile(BaseModel):
         if not self.model_path_folder:
             raise ValueError("model_path_folder is not set.")
 
-        if self.model_url is None:
+        if self.nameof_model is None:
             if self.model_path_basename:
                 return os.path.join(self.model_path_folder, self.model_path_basename)
         load_file_from_url(
             url=self.model_url,
             model_dir=self.model_path_folder,
-            file_name=self.model_name
+            file_name=self.nameof_model
         )
         return os.path.join(self.model_path_folder, self.model_path_basename)
 
+
 class BaseControlNetModelFiles:
     class _BaseControlNetModelFile(_BaseModelFile):
-        model_path_folder = FolderPathsConfig.path_controlnet.value
+        model_path_folder: str = FolderPathsConfig.path_controlnet
         def full_path(self):
             return os.path.join(self.model_path_folder, self.model_path_basename)
     
@@ -77,7 +78,7 @@ class BaseControlNetModelFiles:
 
 class InpaintModelFiles:
     class _InpaintModelFile(_BaseModelFile):
-        model_path_folder = FolderPathsConfig.path_inpaint.value
+        model_path_folder: str = FolderPathsConfig.path_inpaint
 
     def download_based_on_version(self, version):
         if version == "1.0":
@@ -114,13 +115,14 @@ class InpaintModelFiles:
         model_path_basename = 'inpaint_v26.fooocus.patch'
     )
 
+class _SAMFile(_BaseModelFile):
+    model_path_folder: str = FolderPathsConfig.path_sam
+
 class SAM_Files(Enum):
     """
     Segment Anything Model Files
 
     """
-    class _SAMFile(_BaseModelFile):
-        model_path_folder = FolderPathsConfig.path_sam.value
 
     VIT_B = _SAMFile(
         model_name = 'sam_vit_b_01ec64.pth',
@@ -143,6 +145,9 @@ class SAM_Files(Enum):
 
     
 class BaseControlNetTask(BaseModel):
+    class Config:
+        arbitrary_types_allowed = True
+    
     ip_conds: Optional[List[Any]] = None
     ip_unconds: Optional[List[Any]] = None
     stop: float = Field(0.5, ge=0, le=1)
@@ -207,35 +212,48 @@ UpscaleModel = _BaseModelFile(
     model_url="https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin",
     model_name="fooocus_upscaler",
     model_path_basename="fooocus_upscaler_s409985e5.bin",
-    model_path_folder=FolderPathsConfig.path_upscale_models.value
+    model_path_folder=FolderPathsConfig.path_upscale_models
 )
 
 SafetyCheckModel = _BaseModelFile(
     model_url="https://huggingface.co/mashb1t/misc/resolve/main/stable-diffusion-safety-checker.bin",
     model_name="fooocus_safety_check",
     model_path_basename="stable-diffusion-safety-checker.bin",
-    model_path_folder=FolderPathsConfig.path_safety_checker.value
+    model_path_folder=FolderPathsConfig.path_safety_checker
 )
 
 SDXL_LightningLoRA = _BaseModelFile(
     model_url="https://huggingface.co/mashb1t/misc/resolve/main/sdxl_lightning_4step_lora.safetensors",
     model_name=PerformanceLoRA.LIGHTNING.value,
     model_path_basename=PerformanceLoRA.LIGHTNING.value,
-    model_path_folder=FolderPathsConfig.path_loras.value
+    model_path_folder=FolderPathsConfig.path_loras
 )
 
 SDXL_HyperSDLoRA = _BaseModelFile(
     model_url="https://huggingface.co/mashb1t/misc/resolve/main/sdxl_hyper_sd_4step_lora.safetensors",
     model_name=PerformanceLoRA.HYPER_SD.value,
     model_path_basename=PerformanceLoRA.HYPER_SD.value,
-    model_path_folder=FolderPathsConfig.path_loras.value
+    model_path_folder=FolderPathsConfig.path_loras
 )
 
 SDXL_LCM_LoRA = _BaseModelFile(
     model_url="https://huggingface.co/lllyasviel/misc/resolve/main/sdxl_lcm_lora.safetensors",
     model_name=PerformanceLoRA.EXTREME_SPEED.value,
     model_path_basename=PerformanceLoRA.EXTREME_SPEED.value,
-    model_path_folder=FolderPathsConfig.path_loras.value
+    model_path_folder=FolderPathsConfig.path_loras
 )
 
+
+class AllModelFiles(Enum):
+
+    BaseModel: _BaseModelFile = _BaseModelFile()
+    UpscaleModel: _BaseModelFile = UpscaleModel
+    SafetyCheckModel: _BaseModelFile = SafetyCheckModel
+    SDXL_LightningLoRA: _BaseModelFile = SDXL_LightningLoRA
+    SDXL_HyperSDLoRA: _BaseModelFile = SDXL_HyperSDLoRA
+    SDXL_LCM_LoRA: _BaseModelFile = SDXL_LCM_LoRA
+    ControlNetModels: BaseControlNetModelFiles = BaseControlNetModelFiles()
+    InpaintModels: InpaintModelFiles = InpaintModelFiles()
+    SAM_Files: _SAMFile = SAM_Files
+    
 

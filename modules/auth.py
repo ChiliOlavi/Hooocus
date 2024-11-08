@@ -1,6 +1,6 @@
 import json
 import hashlib
-from utils.consts import AUTH_FILENAME
+from h3_utils.consts import AUTH_FILENAME
 
 from os.path import exists
 

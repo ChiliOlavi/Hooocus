@@ -4,7 +4,7 @@ import dotenv
 
 dotenv.load_dotenv()
 
-from utils.consts import CHECK_UPDATES
+from h3_utils.consts import CHECK_UPDATES
 root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(root)
 os.chdir(root)
@@ -66,4 +66,4 @@ if CHECK_UPDATES:
         print(str(e))
 
 print("Launching the application...")
-from utils.launch import *
+from h3_utils.launch import *

@@ -1,6 +1,6 @@
 {
     "model": "realisticStockPhoto_v20.safetensors",
-    "refiner": "None",
+    "refiner": false,
     "refiner_switch": 0.5,
     "loras": [
         [
@@ -42,7 +42,7 @@
         "Fooocus Negative"
     ],
     "aspect_ratio": "896*1152",
-    "overwrite_step": -1,
+    "overwrite_step": false,
     "checkpoint_downloads": {
         "realisticStockPhoto_v20.safetensors": "https://huggingface.co/lllyasviel/fav_models/resolve/main/fav/realisticStockPhoto_v20.safetensors"
     },

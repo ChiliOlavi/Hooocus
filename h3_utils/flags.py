@@ -1,16 +1,18 @@
 import sys, os
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import numpy
 from pydantic import BaseModel, Field
 
-from utils.filesystem_utils import get_files_from_folder, get_model_filenames, get_presets
-from utils.path_configs import FolderPathsConfig
+from h3_utils.filesystem_utils import get_files_from_folder, get_model_filenames, get_presets
+from h3_utils.path_configs import FolderPathsConfig
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from enum import IntEnum, Enum
 from typing import Literal
 import tempfile
-from utils.logging_util import LoggingUtil
+from h3_utils.logging_util import LoggingUtil
 
 log = LoggingUtil().get_logger()
 
@@ -50,10 +52,10 @@ class INPUT_IMAGE_MODES_CLASS:
 
 
 class Overrides(BaseModel):
-    steps: int
-    switch: float
-    width: int
-    height: int
+    steps: int | None = None
+    switch: float | None = None
+    width: int | None = None
+    height: int | None = None
 
 OUTPAINT_SELECTIONS = Literal['Left', 'Right', 'Top', 'Bottom']
 
@@ -122,7 +124,6 @@ SCHEDULER_NAMES_LITERAL = Literal[SCHEDULER_NAMES]
 
 class _AvailableConfigsBase(Enum):
     pass
-    
 
 
 class LatentPreviewMethod(_AvailableConfigsBase):
@@ -201,10 +202,10 @@ class Performance(_AvailableConfigsBase):
 
 INPAINT_ENGINE_VERSIONS = Literal["1.0", "2.5", "2.6"]
 AVAILABLE_PRESETS = get_presets()
-MODEL_FILENAMES = get_model_filenames(FolderPathsConfig.path_checkpoints.value)
-LORA_FILENAMES = get_model_filenames(FolderPathsConfig.path_loras.value)
-VAE_FILENAMES = get_model_filenames(FolderPathsConfig.path_vae.value)
-WILDCARD_FILENAMES = get_files_from_folder(FolderPathsConfig.path_wildcards.value, ['.txt'])
+MODEL_FILENAMES = get_model_filenames(FolderPathsConfig.path_checkpoints)
+LORA_FILENAMES = get_model_filenames(FolderPathsConfig.path_loras)
+VAE_FILENAMES = get_model_filenames(FolderPathsConfig.path_vae)
+WILDCARD_FILENAMES = get_files_from_folder(FolderPathsConfig.path_wildcards, ['.txt'])
 
 performance_lora_keys = PerformanceLoRA.__members__.keys()
 performance_keys = Performance.__members__.keys()

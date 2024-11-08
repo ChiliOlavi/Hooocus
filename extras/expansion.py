@@ -12,9 +12,10 @@ import ldm_patched.modules.model_management as model_management
 
 from transformers.generation.logits_process import LogitsProcessorList
 from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed
-from utils.config import path_fooocus_expansion
+from h3_utils.path_configs import FolderPathsConfig
 from ldm_patched.modules.model_patcher import ModelPatcher
 
+path_fooocus_expansion = FolderPathsConfig.path_fooocus_expansion
 
 # limitation of np.random.seed(), called from transformers.set_seed()
 SEED_LIMIT_NUMPY = 2**32

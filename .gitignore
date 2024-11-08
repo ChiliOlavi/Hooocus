@@ -61,5 +61,6 @@ utils/simple_requirements.txt
 ImageTaskProcessor.pdf
 logs/*.log
 modules/image_generation_utils.py
-utils/meta/graph.sh
 modules/image_generation_utils.py
+h3_utils/meta/graph.sh
+h3_utils/OLD.datamodels.py

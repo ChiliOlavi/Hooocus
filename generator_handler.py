@@ -1,9 +1,9 @@
-from utils.launch import prepare_environment
+from h3_utils.launch import prepare_environment
 prepare_environment()
 
 import modules.async_worker as worker
 import ldm_patched.modules.model_management as model_management
-from utils.hooocus_utils import ImageGenerationSeed, EnhanceMaskCtrls, ControlNetImageTask, LoraTuple
+from h3_utils.hooocus_utils import ImageGenerationSeed, EnhanceMaskCtrls, ControlNetImageTask, LoraTuple
 
 import time
 
