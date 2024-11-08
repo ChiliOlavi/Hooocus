@@ -3,7 +3,7 @@ import os
 import tempfile
 from enum import Enum
 
-class FolderPathsConfig(Enum):
+class FolderPathsConfig:
     path_checkpoints = "./models/checkpoints/"
     path_loras = "./models/loras/"
     path_embeddings = "./models/embeddings/"

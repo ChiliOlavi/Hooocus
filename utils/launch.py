@@ -6,7 +6,12 @@ from utils import config
 from modules.hash_cache import init_cache, load_cache_from_file
 from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
 from modules.model_loader import load_file_from_url
-from utils.config import GlobalEnv
+from utils.config import HOOOCUS_VERSION, GlobalEnv, LAUNCH_ARGS, DefaultConfigImageGen
+from utils.flags import LORA_FILENAMES, MODEL_FILENAMES
+from utils.path_configs import FolderPathsConfig
+
+
+args = LAUNCH_ARGS
 
 
 print('[System ARGV] ' + str(sys.argv))
@@ -27,7 +32,7 @@ def prepare_environment():
     requirements_file = os.environ.get('REQS_FILE', "utils/requirements_versions.txt")
 
     print(f"Python {sys.version}")
-    print(f"Hocus version: {GlobalEnv.HOOOCUS_VERSION}")
+    print(f"Hooocus version: {HOOOCUS_VERSION}")
 
     if GlobalEnv.REINSTALL_ALL or not is_installed("torch") or not is_installed("torchvision"):
         run(f'"{python}" -m {torch_command}', "Installing torch and torchvision", "Couldn't install torch", live=True)
@@ -50,70 +55,58 @@ def prepare_environment():
     if GlobalEnv.REINSTALL_ALL or not requirements_met(requirements_file):
         run_pip(f"install -r \"{requirements_file}\"", "requirements")
 
-    args = ini_args()
+    DefaultConfigImageGen.base_model_name, FolderPathsConfig.path_checkpoints = download_models(
+        DefaultConfigImageGen.base_model_name,
+        DefaultConfigImageGen.previous_default_models,
+        FolderPathsConfig.path_checkpoints,
+        FolderPathsConfig.path_embeddings,
+        FolderPathsConfig.path_loras,
+        FolderPathsConfig.path_vae,
+        args=LAUNCH_ARGS,
+    )
 
-
-    config.default_base_model_name, config.checkpoint_downloads = download_models(
-        config.default_base_model_name, config.previous_default_models, config.checkpoint_downloads,
-        config.embeddings_downloads, config.lora_downloads, config.vae_downloads, args)
-
-    config.update_files()
-
-    if args.gpu_device_id is not None:
+    if args.GeneralArgs.gpu_device_id is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu_device_id)
-        print("Set device to:", args.gpu_device_id)
+        print("Set device to:", args.GeneralArgs.gpu_device_id)
 
     if args.hf_mirror is not None:
         os.environ['HF_MIRROR'] = str(args.hf_mirror)
-        print("Set hf_mirror to:", args.hf_mirror)
+        print("Set hf_mirror to:", args.GeneralArgs.hf_mirror)
 
+    os.environ["U2NET_HOME"] = FolderPathsConfig.path_inpaint
 
-    os.environ["U2NET_HOME"] = config.path_inpaint
+    os.environ['GRADIO_TEMP_DIR'] = FolderPathsConfig.default_temp_path
 
-    os.environ['GRADIO_TEMP_DIR'] = config.temp_path
-
-    if config.temp_path_cleanup_on_launch:
-        print(f'[Cleanup] Attempting to delete content of temp dir {config.temp_path}')
-        result = delete_folder_content(config.temp_path, '[Cleanup] ')
+    if args.GeneralArgs.temp_path_cleanup_on_launch:
+        print(f'[Cleanup] Attempting to delete content of temp dir {FolderPathsConfig.default_temp_path}')
+        result = delete_folder_content(FolderPathsConfig.default_temp_path, '[Cleanup] ')
         if result:
             print("[Cleanup] Cleanup successful")
         else:
             print(f"[Cleanup] Failed to delete content of temp dir.")
-        
 
-
-    if len(hash_cache) == 0 and (len(config.model_filenames) > 0 or len(config.lora_filenames) > 0):
-        hash_cache = init_cache(config.model_filenames, config.paths_checkpoints, config.lora_filenames, config.paths_loras)
+    if len(hash_cache) == 0 and (len(MODEL_FILENAMES) > 0 or len(LORA_FILENAMES) > 0):
+        hash_cache = init_cache(MODEL_FILENAMES, FolderPathsConfig.path_checkpoints, LORA_FILENAMES, FolderPathsConfig.path_loras)
         if len(hash_cache) > 0:
             print(f'[Cache] Initialized with {len(hash_cache)} entries.')
         else:
             print('[Cache] Initialization failed.')
-        
-        
 
     if args.rebuild_hash_cache:
-        init_cache(config.model_filenames, config.paths_checkpoints, config.lora_filenames, config.paths_loras)
+        init_cache(MODEL_FILENAMES, FolderPathsConfig.path_checkpoints, LORA_FILENAMES, FolderPathsConfig.path_loras,)
         print('[Cache] Rebuilt cache.')
     return
 
 
-
-
-
-def ini_args():
-    from utils.launch_arguments import args
-    return args
-
-
-def download_models(default_model, previous_default_models, checkpoint_downloads, embeddings_downloads, lora_downloads, vae_downloads, args):
+def download_models(default_model, previous_default_models, checkpoint_downloads, embeddings_downloads, lora_downloads, vae_downloads, args: LAUNCH_ARGS):
     from modules.util import get_file_from_folder_list
 
     for file_name, url in vae_approx_filenames:
-        load_file_from_url(url=url, model_dir=config.path_vae_approx, file_name=file_name)
+        load_file_from_url(url=url, model_dir=FolderPathsConfig.path_vae_approx, file_name=file_name)
 
     load_file_from_url(
         url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_expansion.bin',
-        model_dir=config.path_fooocus_expansion,
+        model_dir=FolderPathsConfig.path_fooocus_expansion,
         file_name='pytorch_model.bin'
     )
 
@@ -122,9 +115,9 @@ def download_models(default_model, previous_default_models, checkpoint_downloads
         return default_model, checkpoint_downloads
 
     if not args.always_download_new_model:
-        if not os.path.isfile(get_file_from_folder_list(default_model, config.paths_checkpoints)):
+        if not os.path.isfile(get_file_from_folder_list(default_model, FolderPathsConfig.path_checkpoints)):
             for alternative_model_name in previous_default_models:
-                if os.path.isfile(get_file_from_folder_list(alternative_model_name, config.paths_checkpoints)):
+                if os.path.isfile(get_file_from_folder_list(alternative_model_name, FolderPathsConfig.path_checkpoints)):
                     print(f'You do not have [{default_model}] but you have [{alternative_model_name}].')
                     print(f'Fooocus will use [{alternative_model_name}] to avoid downloading new models, '
                           f'but you are not using the latest models.')
@@ -134,15 +127,14 @@ def download_models(default_model, previous_default_models, checkpoint_downloads
                     break
 
     for file_name, url in checkpoint_downloads.items():
-        model_dir = os.path.dirname(get_file_from_folder_list(file_name, config.paths_checkpoints))
+        model_dir = os.path.dirname(get_file_from_folder_list(file_name, FolderPathsConfig.path_checkpoints))
         load_file_from_url(url=url, model_dir=model_dir, file_name=file_name)
     for file_name, url in embeddings_downloads.items():
-        load_file_from_url(url=url, model_dir=config.path_embeddings, file_name=file_name)
+        load_file_from_url(url=url, model_dir=FolderPathsConfig.path_embeddings, file_name=file_name)
     for file_name, url in lora_downloads.items():
-        model_dir = os.path.dirname(get_file_from_folder_list(file_name, config.paths_loras))
+        model_dir = os.path.dirname(get_file_from_folder_list(file_name, FolderPathsConfig.path_loras))
         load_file_from_url(url=url, model_dir=model_dir, file_name=file_name)
     for file_name, url in vae_downloads.items():
-        load_file_from_url(url=url, model_dir=config.path_vae, file_name=file_name)
+        load_file_from_url(url=url, model_dir=FolderPathsConfig.path_vae, file_name=file_name)
 
     return default_model, checkpoint_downloads
-

@@ -89,8 +89,11 @@ class GeneralArgs(BaseModel):
     port: int = 8188
     disable_header_check: str = "false"
     black_out_nsfw: bool = False
+    
+    temp_path_cleanup_on_launch: bool = Field(True, description="The temp path cleanup on launch to use.")
+    
     web_upload_size: float = 100.0
-    hf_mirror: str = None
+    hf_mirror: str = "https:/huggingface.co"
     external_working_path: str = None
     output_path: str = None
     temp_path: str = None
@@ -150,7 +153,7 @@ class VramArgs(BaseModel):
     always_no_vram: int = -1
     always_offload_from_vram: bool = False
 
-class LAUNCH_ARGS:
+class LAUNCH_ARGS(VramArgs, AttentionArgs, FPTEArgs, VaeInFpArgs, FpUnetArgs, FpArgs, CmArgs, GeneralArgs):
     # Modify the initial values here
     VramArgs = VramArgs()
     AttentionArgs = AttentionArgs()
@@ -408,13 +411,8 @@ class ImageGenerationObject(_InitialImageGenerationParams):
     
     def __init__(self, **data):
         super().__init__(**data)
-
-        
-        
-
+    
 HooocusConfig = ImageGenerationObject(**current_preset)
-
-DefaultConfig = ImageGenerationObject(**DEFAULT_PRESET)
-
+DefaultConfigImageGen = ImageGenerationObject(**DEFAULT_PRESET)
 
 print(HooocusConfig.dict())
