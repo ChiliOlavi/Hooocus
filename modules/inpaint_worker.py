@@ -7,9 +7,6 @@ from modules.upscaler import perform_upscale
 import cv2
 
 
-inpaint_head_model = None
-
-
 class InpaintHead(torch.nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -19,8 +16,6 @@ class InpaintHead(torch.nn.Module):
         x = torch.nn.functional.pad(x, (1, 1, 1, 1), "replicate")
         return torch.nn.functional.conv2d(input=x, weight=self.head)
 
-
-current_task = None
 
 
 def box_blur(x, k):
@@ -191,10 +186,9 @@ class InpaintWorker:
         self.latent_after_swap = latent_swap
         return
 
-    def patch(self, inpaint_head_model_path, inpaint_latent, inpaint_latent_mask, model):
-        global inpaint_head_model
+    def patch(self,inpaint_latent, inpaint_latent_mask, model, inpaint_head_model_path=None):
 
-        if inpaint_head_model is None:
+        if inpaint_head_model_path is None:
             inpaint_head_model = InpaintHead()
             sd = torch.load(inpaint_head_model_path, map_location='cpu', weights_only=True)
             inpaint_head_model.load_state_dict(sd)
