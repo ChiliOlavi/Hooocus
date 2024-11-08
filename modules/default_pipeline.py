@@ -1,5 +1,8 @@
 import modules.core as core
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import torch
 import modules.patch
 import utils.config
@@ -13,7 +16,12 @@ from extras.expansion import FooocusExpansion
 from ldm_patched.modules.model_base import SDXL, SDXLRefiner
 from modules.sample_hijack import clip_separate
 from modules.util import get_file_from_folder_list, get_enabled_loras
+from utils.config import GLOBAL_CONFIG, PathsConfig
 
+from utils.logging_util import LoggingUtil
+
+logger = LoggingUtil().get_logger()
+logger.name = 'default_pipeline'
 
 class DefaultPipeline:
 
@@ -40,7 +48,8 @@ class DefaultPipeline:
 
     @torch.no_grad()
     @torch.inference_mode()
-    def refresh_controlnets (self, model_paths):
+    async def refresh_controlnets (self, model_paths):
+        logger.debug(f'Refreshing ControlNets: {model_paths}')
         cache = {}
         for p in model_paths:
             if p is not None:
@@ -51,27 +60,24 @@ class DefaultPipeline:
         self.loaded_ControlNets = cache
         return
 
-    @torch.no_grad()
-    @torch.inference_mode()
     def assert_model_integrity (self):
         error_message = None
 
-        if not isinstance(model_base.unet_with_lora.model, SDXL):
+        if not isinstance(self.model_base.unet_with_lora.model, SDXL):
             error_message = 'You have selected base model other than SDXL. This is not supported yet.'
 
         if error_message is not None:
             raise NotImplementedError(error_message)
-
         return True
 
     @torch.no_grad()
     @torch.inference_mode()
     def refresh_base_model (self, name, vae_name=None):
-        filename = get_file_from_folder_list(name, utils.consts.DEFAULT_PATHS_CONFIG.path_checkpoints)
+        filename = get_file_from_folder_list(name, utils.config.PathsConfig.path_checkpoints.value)
 
         vae_filename = None
-        if vae_name is not None and vae_name != utils.flags.default_vae:
-            vae_filename = get_file_from_folder_list(vae_name, utils.consts.DEFAULT_PATHS_CONFIG.path_vae)
+        if vae_name is not None and vae_name != GLOBAL_CONFIG.default_vae:
+            vae_filename = get_file_from_folder_list(vae_name, utils.config.PathsConfig.path_vae.value)
 
         if self.model_base.filename == filename and self.model_base.vae_filename == vae_filename:
             return
@@ -84,31 +90,27 @@ class DefaultPipeline:
     @torch.no_grad()
     @torch.inference_mode()
     def refresh_refiner_model (self, name):
-        global model_refiner
-
-        filename = get_file_from_folder_list(name, utils.config.paths_checkpoints)
-
-        if model_refiner.filename == filename:
-            return
-
-        model_refiner = core.StableDiffusionModel()
-
-        if name == 'None':
+        if not name:
             print(f'Refiner unloaded.')
             return
-
-        model_refiner = core.load_model(filename)
-        print(f'Refiner model loaded: {model_refiner.filename}')
-
-        if isinstance(model_refiner.unet.model, SDXL):
-            model_refiner.clip = None
-            model_refiner.vae = None
-        elif isinstance(model_refiner.unet.model, SDXLRefiner):
-            model_refiner.clip = None
-            model_refiner.vae = None
+        
+        filename = get_file_from_folder_list(name, PathsConfig.path_checkpoints.value)
+        
+        if self.model_refiner.filename == filename:
+            return
+        
+        self.model_refiner = None
+        self.model_refiner = core.load_model(filename)
+        print(f'Refiner model loaded: {self.model_refiner.filename}')
+        
+        if isinstance(self.model_refiner.unet.model, SDXL):
+            self.model_refiner.clip = None
+            self.model_refiner.vae = None
+        elif isinstance(self.model_refiner.unet.model, SDXLRefiner):
+            self.model_refiner.clip = None
+            self.model_refiner.vae = None
         else:
-            model_refiner.clip = None
-
+            self.model_refiner.clip = None
         return
 
     @torch.no_grad()
@@ -189,7 +191,7 @@ class DefaultPipeline:
         pooled_acc = 0
 
         for i, text in enumerate(texts):
-            cond, pooled = clip_encode_single(final_clip, text)
+            cond, pooled = self.clip_encode_single(self.final_clip, text)
             cond_list.append(cond)
             if i < pool_top_k:
                 pooled_acc += pooled
@@ -209,7 +211,7 @@ class DefaultPipeline:
     @torch.no_grad()
     @torch.inference_mode()
     def clear_all_caches (self):
-        final_clip.fcs_cond_cache = {}
+        self.final_clip.fcs_cond_cache = {}
 
     @torch.no_grad()
     @torch.inference_mode()
@@ -218,7 +220,7 @@ class DefaultPipeline:
             # TODO: make sure that this is always called in an async way so that users cannot feel it.
             pass
         self.assert_model_integrity()
-        ldm_patched.modules.model_management.load_models_gpu([final_clip.patcher, final_expansion.patcher])
+        ldm_patched.modules.model_management.load_models_gpu([self.final_clip.patcher, self.final_expansion.patcher])
         return
 
     @torch.no_grad()
@@ -263,13 +265,6 @@ class DefaultPipeline:
         self.clear_all_caches()
         return
 
-    refresh_everything(
-        refiner_model_name=utils.config.DEFAULT_CONFIG.default_refiner,
-        base_model_name=utils.config.DEFAULT_CONFIG.default_model,
-        loras=get_enabled_loras(utils.config.DEFAULT_CONFIG.default_loras),
-        vae_name=utils.config.DEFAULT_CONFIG.default_vae,
-    )
-
     @torch.no_grad()
     @torch.inference_mode()
     def vae_parse (self, latent):
@@ -308,9 +303,7 @@ class DefaultPipeline:
 
     @torch.no_grad()
     @torch.inference_mode()
-    def get_candidate_vae (self, steps, switch, denoise=1.0, refiner_swap_method='joint'):
-        assert refiner_swap_method in ['joint', 'separate', 'vae']
-
+    def get_candidate_vae (self, steps, switch, denoise=1.0):
         if self.final_refiner_vae is not None and self.final_refiner_unet is not None:
             if denoise > 0.9:
                 return self.final_vae, self.final_refiner_vae
@@ -341,6 +334,7 @@ class DefaultPipeline:
         tiled: bool = False,
         cfg_scale:float = 7.0,
         refiner_swap_method: str = "joint",
+        inpaintworker: modules.inpaint_worker.InpaintWorker = None,
         disable_preview=False):
 
         self.target_model = self.final_model
@@ -350,7 +344,6 @@ class DefaultPipeline:
         self.target_refiner_vae = self.final_refiner_vae
         self.target_clip = self.final_clip
 
-        assert refiner_swap_method in ['joint', 'separate', 'vae']
 
         if self.final_refiner_vae is not None and self.final_refiner_unet is not None:
             # Refiner Use Different VAE (then it is SD15)
@@ -474,8 +467,8 @@ class DefaultPipeline:
             # TODO PATH
             modules.patch.patch_settings[os.getpid()].eps_record = 'vae'
 
-            if modules.inpaint_worker.current_task is not None:
-                modules.inpaint_worker.current_task.unswap()
+            if inpaintworker and inpaintworker.current_task is not None:
+                inpaintworker.unswap()
 
             sampled_latent = core.ksampler(
                 model=self.target_unet,
@@ -512,8 +505,8 @@ class DefaultPipeline:
 
             noise_mean = torch.mean(modules.patch.patch_settings[os.getpid()].eps_record, dim=1, keepdim=True)
 
-            if modules.inpaint_worker.current_task is not None:
-                modules.inpaint_worker.current_task.swap()
+            if inpaintworker and inpaintworker.current_task is not None:
+                inpaintworker.swap()
 
             sampled_latent = core.ksampler(
                 model=self.target_model,
@@ -542,3 +535,4 @@ class DefaultPipeline:
         images = core.pytorch_to_numpy(decoded_latent)
         modules.patch.patch_settings[os.getpid()].eps_record = None
         return images
+

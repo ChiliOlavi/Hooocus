@@ -15,6 +15,7 @@ from utils.logging_util import LoggingUtil
 log = LoggingUtil().get_logger()
 
 
+random_style_name = 'Random Style'
 
 DESCRIBE_TYPE_PHOTO = 'Photograph'
 DESCRIBE_TYPE_ANIME = 'Art/Anime'
@@ -39,6 +40,20 @@ SDXL_ASPECT_RATIOS = Literal[
 ]
 
 INPUT_IMAGE_MODES = Literal['uov', 'inpaint', 'ip', 'desc', 'enhance', 'metadata']
+class INPUT_IMAGE_MODES_CLASS:
+    uov = 'uov'
+    ip = 'ip'
+    inpaint = 'inpaint'
+    desc = 'desc'
+    enhance = 'enhance'
+    metadata = 'metadata'
+
+
+class Overrides(BaseModel):
+    steps: int
+    switch: float
+    width: int
+    height: int
 
 OUTPAINT_SELECTIONS = Literal['Left', 'Right', 'Top', 'Bottom']
 
@@ -183,12 +198,8 @@ class Performance(_AvailableConfigsBase):
 
 
 
-class DefaultControlNetTasks(Enum):
-    ImagePrompt = "ImagePrompt"
-    ImagePromptFaceSwap = "FaceSwap"
-    PyraCanny = "PyraCanny"
-    CPDS = "CPDS"
 
+INPAINT_ENGINE_VERSIONS = Literal["1.0", "2.5", "2.6"]
 AVAILABLE_PRESETS = get_presets()
 MODEL_FILENAMES = get_model_filenames(FolderPathsConfig.path_checkpoints.value)
 LORA_FILENAMES = get_model_filenames(FolderPathsConfig.path_loras.value)

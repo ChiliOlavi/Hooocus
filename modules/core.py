@@ -13,25 +13,20 @@ import ldm_patched.modules.samplers
 import ldm_patched.modules.latent_formats
 
 from ldm_patched.modules.sd import load_checkpoint_guess_config
-from ldm_patched.contrib.external import VAEDecode, EmptyLatentImage, VAEEncode, VAEEncodeTiled, VAEDecodeTiled, \
-    ControlNetApplyAdvanced
-from ldm_patched.contrib.external_freelunch import FreeU_V2
 from ldm_patched.modules.sample import prepare_mask
 from modules.lora import match_lora
 from modules.util import get_file_from_folder_list
 from ldm_patched.modules.lora import model_lora_keys_unet, model_lora_keys_clip
 from utils.config import path_embeddings
-from ldm_patched.contrib.external_model_advanced import ModelSamplingDiscrete, ModelSamplingContinuousEDM
-
-opEmptyLatentImage = EmptyLatentImage()
-opVAEDecode = VAEDecode()
-opVAEEncode = VAEEncode()
-opVAEDecodeTiled = VAEDecodeTiled()
-opVAEEncodeTiled = VAEEncodeTiled()
-opControlNetApplyAdvanced = ControlNetApplyAdvanced()
-opFreeU = FreeU_V2()
-opModelSamplingDiscrete = ModelSamplingDiscrete()
-opModelSamplingContinuousEDM = ModelSamplingContinuousEDM()
+from unavoided_global_vars import (
+    opEmptyLatentImage,
+    opVAEDecode,
+    opVAEEncode,
+    opVAEDecodeTiled,
+    opVAEEncodeTiled,
+    opControlNetApplyAdvanced,
+    opFreeU,
+)
 
 
 class StableDiffusionModel:

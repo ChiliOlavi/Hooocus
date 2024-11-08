@@ -62,7 +62,7 @@ class BaseControlNetModelFiles:
     )
 
     PyraCanny = _BaseControlNetModelFile(
-        controlnet_name = 'pyra_canny',
+        controlnet_name = 'canny',
         model_name = 'canny',
         model_url = 'https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors',
         model_path_basename = 'control-lora-canny-rank128.safetensors',
@@ -78,6 +78,17 @@ class BaseControlNetModelFiles:
 class InpaintModelFiles:
     class _InpaintModelFile(_BaseModelFile):
         model_path_folder = FolderPathsConfig.path_inpaint.value
+
+    def download_based_on_version(self, version):
+        if version == "1.0":
+            return self.InpaintPatchV1.download_model()
+        elif version == "2.5":
+            return self.InpaintPatchV25.download_model()
+        elif version == "2.6":
+            return self.InpaintPatchV26.download_model()
+        else:
+            raise ValueError("Invalid version number.")
+
 
     InpaintHead = _InpaintModelFile(
         model_name = 'fooocus_inpaint_head.pth',
@@ -129,15 +140,23 @@ class SAM_Files(Enum):
         model_path_basename = 'sam_vit_h_4b8939.pth'
     )
 
+
+    
 class BaseControlNetTask(BaseModel):
     stop: float = Field(0.5, ge=0, le=1)
     img: Optional[numpy.ndarray] = None
     weight: float = Field(1.0, ge=0, le=1)
-    models: Optional[List[BaseControlNetModelFiles]] = None
+    models: Optional[List[BaseControlNetModelFiles._BaseControlNetModelFile]] = None
     name: str = Field(None, description="Name of the ControlNetTask.")
+    model_paths: Optional[List[str]] = None
 
-class ControlNetTasks:
-    ImagePrompt = BaseControlNetTask(
+    def get_paths(self):
+        if self.models is None:
+            return []
+        return [model.full_path() for model in self.models]
+
+class ControlNetTasks(BaseModel):
+    ImagePrompt: BaseControlNetTask = BaseControlNetTask(
         stop = 0.5,
         name = "ImagePrompt",
         weight = 0.6,
@@ -149,7 +168,7 @@ class ControlNetTasks:
         ]
     )
     
-    FaceSwap = BaseControlNetTask(
+    FaceSwap: BaseControlNetTask = BaseControlNetTask(
         stop = 0.9,
         img = None,
         name = "FaceSwap",
@@ -158,10 +177,10 @@ class ControlNetTasks:
             BaseControlNetModelFiles.ImagePromptClipVIsion,
             BaseControlNetModelFiles.ImagePromptAdapterFace,
             BaseControlNetModelFiles.ImagePromptAdapterNegative
-        ]
+        ],
     )
 
-    PyraCanny = BaseControlNetTask(
+    PyraCanny: BaseControlNetTask = BaseControlNetTask(
         stop = 0.5,
         img = None,
         name = "PyraCanny",
@@ -169,9 +188,10 @@ class ControlNetTasks:
         models = [
             BaseControlNetModelFiles.PyraCanny
         ]
+
         )
 
-    CPDS = BaseControlNetTask(    
+    CPDS: BaseControlNetTask = BaseControlNetTask(
         stop = 0.5,
         img = None,
         name = "CPDS",
@@ -216,4 +236,4 @@ SDXL_LCM_LoRA = _BaseModelFile(
     model_path_folder=FolderPathsConfig.path_loras.value
 )
 
-ControlNetTasks = 
+

@@ -1,6 +1,9 @@
 from calendar import c
 import os
 import sys
+from turtle import width
+
+from torch import Tensor
 
 from modules.image_generation_utils import progressbar
 from modules.inpaint_worker import InpaintWorker
@@ -9,16 +12,16 @@ import random
 
 import numpy
 
-from utils.flags import DESCRIBE_TYPE_PHOTO, ENHANCEMENT_UOV_PROMPT_TYPE_ORIGINAL, KSAMPLER, REFINER_SWAP_METHODS, SDXL_ASPECT_RATIOS, UPSCALE_OR_VARIATION_MODES, Steps
+from utils.flags import DESCRIBE_TYPE_PHOTO, ENHANCEMENT_UOV_PROMPT_TYPE_ORIGINAL, KSAMPLER, REFINER_SWAP_METHODS, SDXL_ASPECT_RATIOS, UPSCALE_OR_VARIATION_MODES, Overrides, Steps
 
 PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PARENT_DIR)
 
 import json
 import tempfile
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from enum import Enum
-from utils.model_file_config import ControlNetTasks, SDXL_LightningLoRA, SDXL_HyperSDLoRA, SDXL_LCM_LoRA
+from utils.model_file_config import BaseControlNetTask, ControlNetTasks, SDXL_LightningLoRA, SDXL_HyperSDLoRA, SDXL_LCM_LoRA, BaseControlNetModelFiles
 from utils.sdxl_prompt_expansion_utils import fooocus_expansion
 from pydantic import BaseModel, Field
 
@@ -186,7 +189,6 @@ class DeveloperOptions(BaseModel):
     read_wildcards_in_order: bool = False
     metadata_created_by: str = Field("", description="The metadata created by to use.")
     metadata_scheme: str = Field("Hooocus", description="The default metadata scheme to use.")
-    callback_steps: int = -1 # Used in async worker...
     debugging_cn_preprocessor: bool = False
     debugging_dino: bool = False
     debugging_enhance_masks_checkbox: bool = False
@@ -206,18 +208,14 @@ class InptaintOptions(BaseModel):
         arbitrary_types_allowed = True
 
     inpaint_worker_current_task: Optional[Any] = None
-
-    inpaint_input_image: Dict[Literal["image", "mask"], numpy.ndarray]
-    inpaint_mask_image: Optional[Dict[Literal["image", "mask"]]] = None
     outpaint_selections: Optional[OUTPAINT_SELECTIONS] = None
     invert_mask: bool = False
     inpaint_mask_model: str = Field('isnet-general-use', description="The default invert mask model to use.")
-    inpaint_additional_prompt: str = None
+    inpaint_additional_prompt: Optional[str] = None
     inpaint_disable_initial_latent: bool = False
     inpaint_engine_version: str = Field("v2.6", description="The default inpaint engine version to use.")
-    inpaint_erode_or_dilate: int = 0 # min -64 max 64
+    inpaint_erode_or_dilate: Optional[int] = Field(None, le=64, ge=-64)
     inpaint_mask_cloth_category: str = Field('full', description="The default inpaint mask cloth category to use.")
-    inpaint_mask_image_upload: numpy.ndarray = None
     inpaint_mask_sam_model: str = Field('vit_b', description="The default inpaint mask sam model to use.")
     inpaint_method: str = Field("Inpaint or Outpaint (default)", description="The default inpaint method to use.")
     inpaint_respective_field: float = 0.618 # min 0.0 max 1.0
@@ -236,7 +234,6 @@ class EnhanceMaskCtrls(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    enhance_input_image: Optional[numpy.ndarray] = None
     enhance_tabs: int = Field(3, description="The default enhance tabs to use.")
     enhance_mask_dino_prompt_text: str = EXAMPLE_ENHANCE_DETECTION_PROMPTS[0]
     
@@ -253,7 +250,7 @@ class EnhanceMaskCtrls(BaseModel):
     enhance_mask_sam_max_detections: int = Field(0, description="The default enhance mask sam max detections to use.", ge=0, le=10)
     
     enhance_inpaint_disable_initial_latent: bool = False
-    enhance_inpaint_engine: str = Field("v2.6", description="The default enhance inpaint engine version to use.")
+    enhance_inpaint_engine: str = Field("2.6", description="The default enhance inpaint engine version to use.")
         
     enhance_inpaint_strength: float = Field(1.0, description="The default enhance inpaint strength to use.", ge=0.0, le=1.0)
     enhance_inpaint_respective_field: float = Field(0.618, description="The default enhance inpaint respective field to use.", ge=0.0, le=1.0)
@@ -266,13 +263,16 @@ class EnhanceMaskCtrls(BaseModel):
     enhance_uov_prompt_type: int = Field(ENHANCEMENT_UOV_PROMPT_TYPE_ORIGINAL, description="The default enhance uov prompt type to use.")
     
 
-class InitialHooocusConfig(BaseModel):
+class _InitialImageGenerationParams(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
     prompt_negative: str = Field(DEFAULT_PRESET["prompt_negative"], description="The default negative prompt to use.")
-    prompt: str = Field("A cat smoking a pipe.", description="The default prompt to use.")
+    prompt: Optional[str] = Field(None, description="The default prompt to use.")
     negative_prompt: str = ""
+
+    width: Optional[int] = Field(None, description="The default width to use.")
+    height: Optional[int] = Field(None, description="The default height to use.")
     
     sample_sharpness: float = Field(DEFAULT_PRESET["sample_sharpness"], description="The default sample sharpness to use.")
     seed: int = random.randint(LAUNCH_ARGS.GeneralArgs.min_seed, LAUNCH_ARGS.GeneralArgs.max_seed)
@@ -302,7 +302,8 @@ class InitialHooocusConfig(BaseModel):
     image_number: int = Field(2, description="The default image number to use.", ge=1)
     
     steps: int = -1
-    _original_steps: int = -1
+    original_steps: int = -1
+
     adaptive_cfg: float = Field(7.0, description="The default cfg tsnr to use.", ge=1.0, le=30.0)
     cfg_scale: float = Field(DEFAULT_PRESET["cfg_scale"], description="Higher value means style is cleaner, vivider, and more artistic.", ge=1.0, le=30.0)
     cfg_tsnr: float = Field(7.0, description="The default cfg tsnr to use.")
@@ -325,11 +326,10 @@ class InitialHooocusConfig(BaseModel):
     dino_erode_or_dilate: int = 0 # min -64 max 64
 
     
-    image_input_mode: INPUT_IMAGE_MODES = Field("uov", description="The image input mode to use.") # utils.flags.input_image_tab_ids 
-    enhance_tasks: Optional[list[EnhanceMaskCtrls]] = None
+    enhance_task: Optional[EnhanceMaskCtrls] = None
     freeu_controls: Optional[FreeUControls] = None
     inpaint_options: Optional[InptaintOptions] = None
-    controlnet_tasks: Optional[List[ControlNetTasks]] = None
+    controlnet_tasks: Optional[List[BaseControlNetTask]] = None
     overwrite_controls: Optional[OverWriteControls] = None
     developer_options: Optional[DeveloperOptions] = None
     
@@ -342,18 +342,62 @@ class InitialHooocusConfig(BaseModel):
     use_upscale_or_vary: bool = False
     mix_image_prompt_and_vary_upscale: bool = False
     mix_image_prompt_and_inpaint: bool = False
+
+    image_input_mode: INPUT_IMAGE_MODES = Field("uov", description="The image input mode to use.") # utils.flags.input_image_tab_ids 
     
-    uov_input_image: Optional[numpy.ndarray] = None # TODO: trigger_auto_describe
+    input_image: Dict[Literal["image", "mask"], numpy.ndarray]
+    uov_input_image: Optional[numpy.ndarray] = None
+    input_mask_image: Optional[Dict[Literal["image", "mask"], numpy.ndarray]] = None
+    prepared_input_mask_image: Optional[numpy.ndarray] = None
+    enhance_input_image: Optional[numpy.ndarray] = None
+    
     uov_method: Optional[UPSCALE_OR_VARIATION_MODES] = Field(None, description="The default uov method to use.")
+    steps_uov: int = -1
     
 
-class ImageGenerationObject(InitialHooocusConfig):
-    use_styles: bool = False
-    last_stop: bool = False
 
-    #generate_image_grid: bool = False
+class TaskletObject(BaseModel):
+    """A tasklet object for the async worker.
+    
+    - It's a variation of a ImageGenerationObject 
+    with additional fields for the pipeline.process_diffusion method.
 
-class ValidateHooocusConfig(InitialHooocusConfig):
+    - So if you have an ImageGenerationObject with image_count=2,
+    you will have 2 TaskletObjects with the same data but some
+    variations for the pipeline.process_diffusion method.
+    """
+    task_seed: int 
+    task_prompt: str
+    task_negative_prompt: str
+    positive_basic_workloads: List[str]
+    positive_basic_workloads: List[str]
+    expansion: str
+    positive_cond: Any = None
+    negative_cond: Any = None
+    # [[torch.cat(cond_list, dim=1), {"pooled_output": pooled_acc}]]
+    encoded_positive_cond: Optional[Tuple[Tensor, Dict[str, Tensor]]] = None
+    encoded_negative_cond: Optional[Tuple[Tensor, Dict[str, Tensor]]] = None
+    positive_top_k: int = 0
+    negative_top_k: int = 0
+    log_positive_prompt: str 
+    log_negative_prompt: str
+    styles: List[str]
+
+class ApplyImageInputParams(BaseModel):
+    base_model_additional_loras: List[str]
+    clip_vision_path: str
+    controlnet_canny_path: str
+    controlnet_cpds_path: str
+    inpaint_head_model_path: str
+    inpaint_image: str
+    inpaint_mask: str
+    ip_adapter_face_path: str
+    ip_adapter_path: str
+    ip_negative_path: str
+    skip_prompt_processing: bool
+    use_synthetic_refiner: bool
+
+class ImageGenerationObject(_InitialImageGenerationParams):
     
     class Config:
         arbitrary_types_allowed = True
@@ -361,6 +405,20 @@ class ValidateHooocusConfig(InitialHooocusConfig):
     
     def __init__(self, **data):
         super().__init__(**data)
+        """  self.controlnet_pyracanny_path: Optional[str] = None
+        self.controlnet_cpds_path: Optional[str] = None
+        self.clip_vision_path: Optional[str] = None
+        self.ip_negative_path: Optional[str] = None
+        self.ip_adapter_path: Optional[str] = None
+        self.ip_adapter_face_path: Optional[str] = None
+        self.inpaint_head_model_path: Optional[str] = None
+        self.inpaint_patch_model_path: Optional[str] = None
+        self.upscale_model_path: Optional[str] = None
+
+
+        self.set_steps()
+        self.check_refiner_not_same_as_base_model()
+
         ...
 
     def set_steps(self):
@@ -371,10 +429,31 @@ class ValidateHooocusConfig(InitialHooocusConfig):
     def check_refiner_not_same_as_base_model(self):
         if self.base_model_name == self.refiner_model:
             self.refiner_model = None
+
+    def get_overrides(self, steps: int, height: int, width: int) -> Overrides:
+        overrides = self.overwrite_controls
+        
+        if overrides.overwrite_step > 0:
+            steps = self.overwrite_controls.overwrite_step
+        switch = int(round(steps * self.refiner_switch))
+        if overrides.overwrite_switch > 0:
+            switch = overrides.overwrite_switch
+        if overrides.overwrite_width > 0:
+            width = overrides.overwrite_width
+        if overrides.overwrite_height > 0:
+            height = overrides.overwrite_height
+
+        return_obj = Overrides(
+            steps=steps,
+            switch=switch,
+            width=width,
+            height=height,
+        )
+        return return_obj
     
         
     def get_defaults_per_performance(self):
-        if self.refiner_model_name != "None":
+        if self.refiner_model:
             print(f"Refiner disabled in {self.performance_selection.name} mode.")
         match self.performance_selection:
             case Performance.HYPER_SD:
@@ -386,7 +465,7 @@ class ValidateHooocusConfig(InitialHooocusConfig):
 
     def _set_hyper_sd_defaults(self):
         self.performance_loras += [(SDXL_HyperSDLoRA.download_model(), 0.8)]
-        self.refiner_model_name = "None"
+        self.refiner_model = None
         self.sampler_name = "dpmpp_sde_gpu"
         self.scheduler_name = "karras"
         self.sharpness = 0.0
@@ -401,7 +480,7 @@ class ValidateHooocusConfig(InitialHooocusConfig):
     def _set_lightning_defaults(self):
         print("Enter Lightning mode.")
         self.performance_loras += [SDXL_LightningLoRA.download_model(), 1.0]
-        self.refiner_model_name = "None"
+        self.refiner_model = None
         self.sampler_name = "euler"
         self.scheduler_name = "sgm_uniform"
         self.sharpness = 0.0
@@ -419,7 +498,7 @@ class ValidateHooocusConfig(InitialHooocusConfig):
         self.performance_loras += [
             (SDXL_LCM_LoRA.download_model(), 1.0)
         ]
-        self.refiner_model_name = "None"
+        self.refiner_model = None
         self.sampler_name = "lcm"
         self.scheduler_name = "lcm"
         self.sharpness = 0.0
@@ -445,6 +524,25 @@ class ValidateHooocusConfig(InitialHooocusConfig):
         
         self.aspect_ratio = self.aspect_ratio.split('*')
         self.aspect_ratio = [int(x) for x in self.aspect_ratio]
+
+        self.width, self.height = self.aspect_ratio.split('*')
+        self.width, self.height = int(self.width), int(self.height)
+
+
+
+    def update_controlnet_models(self):
+         if self.controlnet_tasks:
+                for controlnet_task in self.controlnet_tasks:
+                    log.info(f'Downloading controlnet model for {controlnet_task.name} ...')
+                    for model in controlnet_task.models:
+                        model.download_model()
+                        self.controlnet_pyracanny_path = BaseControlNetModelFiles.PyraCanny.full_path()
+                        self.controlnet_cpds_path = BaseControlNetModelFiles.CPDS.full_path()
+                        self.clip_vision_path = BaseControlNetModelFiles.ImagePromptClipVIsion.full_path()
+                        self.ip_negative_path = BaseControlNetModelFiles.ImagePromptAdapterNegative.full_path()
+                        self.ip_adapter_path = BaseControlNetModelFiles.ImagePromptAdapterPlus.full_path()
+                        self.ip_adapter_face_path = BaseControlNetModelFiles.ImagePromptAdapterFace.full_path() """
+
 
         
         
