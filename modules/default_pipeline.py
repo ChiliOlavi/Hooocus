@@ -19,9 +19,10 @@ from extras.expansion import FooocusExpansion
 from ldm_patched.modules.model_base import SDXL, SDXLRefiner
 from modules.sample_hijack import clip_separate
 from modules.util import get_file_from_folder_list, get_enabled_loras
-from h3_utils.config import LAUNCH_ARGS
-
+from h3_utils.config import LAUNCH_ARGS, DefaultConfigImageGen
 from h3_utils.logging_util import LoggingUtil
+
+from unavoided_global_hell.unavoided_global_vars import patch_settings_GLOBAL_CAUTION
 
 logger = LoggingUtil().get_logger()
 logger.name = 'default_pipeline'
@@ -76,10 +77,10 @@ class DefaultPipeline:
     @torch.no_grad()
     @torch.inference_mode()
     def refresh_base_model (self, name, vae_name=None):
-        filename = get_file_from_folder_list(name, FolderPathsConfig.path_checkpoints.value)
+        filename = get_file_from_folder_list(name, FolderPathsConfig.path_checkpoints)
 
         vae_filename = None
-        if vae_name is not None and vae_name != config.DefaultConfig.vae_name:
+        if vae_name is not None and vae_name != DefaultConfigImageGen.vae_name:
             vae_filename = get_file_from_folder_list(vae_name, FolderPathsConfig.path_vae.value)
 
         if self.model_base.filename == filename and self.model_base.vae_filename == vae_filename:
@@ -296,7 +297,7 @@ class DefaultPipeline:
     @torch.no_grad()
     @torch.inference_mode()
     def calculate_sigmas (self, sampler, model, scheduler, steps, denoise):
-        if denoise is None or denoise > 0.9999:
+        if denoise is None or denoise > 0.9999 or denoise < 0.000001:
             sigmas = self.calculate_sigmas_all(sampler, model, scheduler, steps)
         else:
             new_steps = int(steps / denoise)
@@ -468,7 +469,8 @@ class DefaultPipeline:
 
         if refiner_swap_method == 'vae':
             # TODO PATH
-            modules.patch.patch_settings[os.getpid()].eps_record = 'vae'
+            # GLOBAL VAR USAGE
+            patch_settings_GLOBAL_CAUTION[os.getpid()].eps_record = 'vae'
 
             if inpaintworker and inpaintworker.current_task is not None:
                 inpaintworker.unswap()
@@ -506,7 +508,8 @@ class DefaultPipeline:
                                     denoise=denoise)[switch:] * k_sigmas
             len_sigmas = len(sigmas) - 1
 
-            noise_mean = torch.mean(modules.patch.patch_settings[os.getpid()].eps_record, dim=1, keepdim=True)
+            # GLOBAL VAR USAGE
+            noise_mean = torch.mean(patch_settings_GLOBAL_CAUTION[os.getpid()].eps_record, dim=1, keepdim=True)
 
             if inpaintworker and inpaintworker.current_task is not None:
                 inpaintworker.swap()
@@ -536,6 +539,8 @@ class DefaultPipeline:
             decoded_latent = core.decode_vae(vae=self.target_model, latent_image=sampled_latent, tiled=tiled)
 
         images = core.pytorch_to_numpy(decoded_latent)
-        modules.patch.patch_settings[os.getpid()].eps_record = None
+        
+        # GLOBAL VAR USAGE
+        patch_settings_GLOBAL_CAUTION[os.getpid()].eps_record = None
         return images
 
