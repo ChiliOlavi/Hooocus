@@ -1,7 +1,5 @@
-from ast import Dict
 import os
-import sys
-from typing import List, Optional
+from typing import List, Optional, Dict
 from httpx import patch
 import torch
 import time
@@ -33,9 +31,13 @@ from modules.patch_precision import patch_all_precision
 from modules.patch_clip import patch_all_clip
 from pydantic import BaseModel
 
-from unavoided_global_vars import patch_settings_GLOBAL_CAUTION, PatchSettings
+from unavoided_global_hell.unavoided_global_vars import (
+    patch_settings_GLOBAL_CAUTION, 
+    PatchSettings,
+    inpaintworker_current_task_GLOBAL_CAUTION,
+)
 
-GeneralArgs = LAUNCH_ARGS.GeneralArgs
+GeneralArgs = LAUNCH_ARGS
 
         
 def calculate_weight_patched(self, patches, weight, key):
@@ -173,12 +175,13 @@ def calculate_weight_patched(self, patches, weight, key):
 
 def compute_cfg(self, uncond, cond, cfg_scale, t, patch_settings: PatchSettings = None):
     pid = os.getpid()
-    mimic_cfg = float(self.patch_settings.adaptive_cfg)
+    patch_settings: PatchSettings = patch_settings_GLOBAL_CAUTION[pid]
+    mimic_cfg = float(patch_settings.adaptive_cfg)
     real_cfg = float(cfg_scale)
 
     real_eps = uncond + real_cfg * (cond - uncond)
 
-    if cfg_scale > self.patch_settings[pid].adaptive_cfg:
+    if cfg_scale > patch_settings.adaptive_cfg:
         mimicked_eps = uncond + mimic_cfg * (cond - uncond)
         return real_eps * t + mimicked_eps * (1 - t)
     else:
@@ -186,12 +189,13 @@ def compute_cfg(self, uncond, cond, cfg_scale, t, patch_settings: PatchSettings 
 
 def patched_sampling_function(self, model, x, timestep, uncond, cond, cond_scale, model_options=None, seed=None):
     pid = os.getpid()
+    patch_settings: Dict[int, PatchSettings] = patch_settings_GLOBAL_CAUTION
 
     if math.isclose(cond_scale, 1.0) and not model_options.get("disable_cfg1_optimization", False):
         final_x0 = calc_cond_uncond_batch(model, cond, None, x, timestep, model_options)[0]
 
-        if self.patch_settings[pid].eps_record is not None:
-            self.patch_settings[pid].eps_record = ((x - final_x0) / timestep).cpu()
+        if patch_settings[pid].eps_record is not None:
+            patch_settings[pid].eps_record = ((x - final_x0) / timestep).cpu()
 
         return final_x0
 
@@ -200,16 +204,16 @@ def patched_sampling_function(self, model, x, timestep, uncond, cond, cond_scale
     positive_eps = x - positive_x0
     negative_eps = x - negative_x0
 
-    alpha = 0.001 * self.patch_settings[pid].sharpness * self.patch_settings[pid].global_diffusion_progress
+    alpha = 0.001 * patch_settings[pid].sharpness * patch_settings[pid].global_diffusion_progress
 
     positive_eps_degraded = anisotropic.adaptive_anisotropic_filter(x=positive_eps, g=positive_x0)
     positive_eps_degraded_weighted = positive_eps_degraded * alpha + positive_eps * (1.0 - alpha)
 
-    final_eps = self.compute_cfg(uncond=negative_eps, cond=positive_eps_degraded_weighted,
-                            cfg_scale=cond_scale, t=self.patch_settings[pid].global_diffusion_progress)
+    final_eps = compute_cfg(self, uncond=negative_eps, cond=positive_eps_degraded_weighted,
+                            cfg_scale=cond_scale, t=patch_settings[pid].global_diffusion_progress)
 
-    if self.patch_settings[pid].eps_record is not None:
-        self.patch_settings[pid].eps_record = (final_eps / timestep).cpu()
+    if patch_settings[pid].eps_record is not None:
+        patch_settings[pid].eps_record = (final_eps / timestep).cpu()
 
     return x - final_eps
 
@@ -246,8 +250,12 @@ class BrownianTreeNoiseSamplerPatched:
 
 
 
-def sdxl_encode_adm_patched(self, patch_settings: PatchSettings, **kwargs):
+def sdxl_encode_adm_patched(self, **kwargs):
     clip_pooled = ldm_patched.modules.model_base.sdxl_pooled(kwargs, self.noise_augmentor)
+    
+    current_pid = os.getpid()
+    patch_settings: PatchSettings = patch_settings_GLOBAL_CAUTION[current_pid]
+    
     width = kwargs.get("width", 1024)
     height = kwargs.get("height", 1024)
     target_width = width
@@ -278,7 +286,7 @@ def sdxl_encode_adm_patched(self, patch_settings: PatchSettings, **kwargs):
     return final_adm
 
 def patched_KSamplerX0Inpaint_forward(self, x, sigma, uncond, cond, cond_scale, denoise_mask, model_options={}, seed=None):
-    if inpaint_worker.current_task is not None:
+    if inpaintworker_current_task_GLOBAL_CAUTION is not None:
         latent_processor = self.inner_model.inner_model.process_latent_in
         inpaint_latent = latent_processor(inpaint_worker.current_task.latent).to(x)
         inpaint_mask = inpaint_worker.current_task.latent_mask.to(x)
@@ -310,7 +318,9 @@ def patched_KSamplerX0Inpaint_forward(self, x, sigma, uncond, cond, cond_scale, 
     return out
 
 
-def timed_adm(y, timesteps, patch_settings: PatchSettings = None):
+def timed_adm(y, timesteps):
+    patch_settings: PatchSettings = patch_settings_GLOBAL_CAUTION[os.getpid()]
+
     if isinstance(y, torch.Tensor) and int(y.dim()) == 2 and int(y.shape[1]) == 5632:
         y_mask = (timesteps > 999.0 * (1.0 - float(patch_settings.adm_scaler_end))).to(y)[..., None]
         y_with_adm = y[..., :2816].clone()
@@ -357,6 +367,8 @@ def patched_cldm_forward(self, x, hint, timesteps, context, y=None, patch_settin
 
 
 def patched_unet_forward(self, x, timesteps=None, context=None, y=None, control=None, transformer_options={}, **kwargs):
+    patch_settings = patch_settings_GLOBAL_CAUTION
+
     self.current_step = 1.0 - timesteps.to(x) / 999.0
     patch_settings[os.getpid()].global_diffusion_progress = float(self.current_step.detach().cpu().numpy().tolist()[0])
 
