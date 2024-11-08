@@ -51,7 +51,6 @@ class GlobalEnv:
     # NB! Do not store any sensitive information here. Use normal .env files for that.
 
     PYTHONFAULTHANDLER=1
-    HOOOCUS_VERSION = '0.5.0'
 
     # launch.py
     REINSTALL_ALL = False
@@ -65,6 +64,10 @@ class GlobalEnv:
         super().__init__(**data)
         for _key, value in data.items():
             os.environ[_key] = str(value)
+
+
+HOOOCUS_VERSION = '0.5.0'
+METADATA_SCHEME = "Hooocus"
 
 class GeneralArgs(BaseModel):
     class Config:
@@ -188,7 +191,7 @@ class DeveloperOptions(BaseModel):
      # ?
     read_wildcards_in_order: bool = False
     metadata_created_by: str = Field("", description="The metadata created by to use.")
-    metadata_scheme: str = Field("Hooocus", description="The default metadata scheme to use.")
+    metadata_scheme: str = Field(METADATA_SCHEME, description="The default metadata scheme to use.")
     debugging_cn_preprocessor: bool = False
     debugging_dino: bool = False
     debugging_enhance_masks_checkbox: bool = False
@@ -405,149 +408,13 @@ class ImageGenerationObject(_InitialImageGenerationParams):
     
     def __init__(self, **data):
         super().__init__(**data)
-        """  self.controlnet_pyracanny_path: Optional[str] = None
-        self.controlnet_cpds_path: Optional[str] = None
-        self.clip_vision_path: Optional[str] = None
-        self.ip_negative_path: Optional[str] = None
-        self.ip_adapter_path: Optional[str] = None
-        self.ip_adapter_face_path: Optional[str] = None
-        self.inpaint_head_model_path: Optional[str] = None
-        self.inpaint_patch_model_path: Optional[str] = None
-        self.upscale_model_path: Optional[str] = None
-
-
-        self.set_steps()
-        self.check_refiner_not_same_as_base_model()
-
-        ...
-
-    def set_steps(self):
-        perf_name = self.performance_selection.name
-        self.steps = self.steps if self.steps != -1 else Steps[perf_name].value
-        self.original_steps = self.original_steps if self.original_steps != -1 else self.steps
-
-    def check_refiner_not_same_as_base_model(self):
-        if self.base_model_name == self.refiner_model:
-            self.refiner_model = None
-
-    def get_overrides(self, steps: int, height: int, width: int) -> Overrides:
-        overrides = self.overwrite_controls
-        
-        if overrides.overwrite_step > 0:
-            steps = self.overwrite_controls.overwrite_step
-        switch = int(round(steps * self.refiner_switch))
-        if overrides.overwrite_switch > 0:
-            switch = overrides.overwrite_switch
-        if overrides.overwrite_width > 0:
-            width = overrides.overwrite_width
-        if overrides.overwrite_height > 0:
-            height = overrides.overwrite_height
-
-        return_obj = Overrides(
-            steps=steps,
-            switch=switch,
-            width=width,
-            height=height,
-        )
-        return return_obj
-    
-        
-    def get_defaults_per_performance(self):
-        if self.refiner_model:
-            print(f"Refiner disabled in {self.performance_selection.name} mode.")
-        match self.performance_selection:
-            case Performance.HYPER_SD:
-                self._set_hyper_sd_defaults()
-            case Performance.LIGHTNING:
-                self._set_lightning_defaults()
-            case Performance.EXTREME_SPEED:
-                self._set_lcm_defaults()  
-
-    def _set_hyper_sd_defaults(self):
-        self.performance_loras += [(SDXL_HyperSDLoRA.download_model(), 0.8)]
-        self.refiner_model = None
-        self.sampler_name = "dpmpp_sde_gpu"
-        self.scheduler_name = "karras"
-        self.sharpness = 0.0
-        self.cfg_scale = 1.0
-        self.adaptive_cfg = 1.0
-        self.refiner_switch = 1.0
-        self.adm_scaler_positive = 1.0
-        self.adm_scaler_negative = 1.0
-        self.adm_scaler_end = 0.0
-        return
-
-    def _set_lightning_defaults(self):
-        print("Enter Lightning mode.")
-        self.performance_loras += [SDXL_LightningLoRA.download_model(), 1.0]
-        self.refiner_model = None
-        self.sampler_name = "euler"
-        self.scheduler_name = "sgm_uniform"
-        self.sharpness = 0.0
-        self.cfg_scale = 1.0
-        self.adaptive_cfg = 1.0
-        self.refiner_switch = 1.0
-        self.adm_scaler_positive = 1.0
-        self.adm_scaler_negative = 1.0
-        self.adm_scaler_end = 0.0
-        return
-
-    def _set_lcm_defaults(self):
-        print("Enter LCM mode.")
-        progressbar(1, "Downloading LCM components ...")
-        self.performance_loras += [
-            (SDXL_LCM_LoRA.download_model(), 1.0)
-        ]
-        self.refiner_model = None
-        self.sampler_name = "lcm"
-        self.scheduler_name = "lcm"
-        self.sharpness = 0.0
-        self.cfg_scale = 1.0
-        self.adaptive_cfg = 1.0
-        self.refiner_switch = 1.0
-        self.adm_scaler_positive = 1.0
-        self.adm_scaler_negative = 1.0
-        self.adm_scaler_end = 0.0
-        
-    def prepare_attributes(self):
-        self.outpaint_selections = [o.lower() for o in self.outpaint_selections]
-        self.uov_method = self.uov_method.lower()
-
-        if self.enhance_tasks:
-            for task in self.enhance_tasks:
-                task.enhance_uov_method = task.enhance_uov_method.lower()
-        if fooocus_expansion in self.styles:
-            self.use_prompt_expansion = True 
-            self.styles.remove(fooocus_expansion)
-
-        self.use_styles = len(self.styles) > 0
-        
-        self.aspect_ratio = self.aspect_ratio.split('*')
-        self.aspect_ratio = [int(x) for x in self.aspect_ratio]
-
-        self.width, self.height = self.aspect_ratio.split('*')
-        self.width, self.height = int(self.width), int(self.height)
-
-
-
-    def update_controlnet_models(self):
-         if self.controlnet_tasks:
-                for controlnet_task in self.controlnet_tasks:
-                    log.info(f'Downloading controlnet model for {controlnet_task.name} ...')
-                    for model in controlnet_task.models:
-                        model.download_model()
-                        self.controlnet_pyracanny_path = BaseControlNetModelFiles.PyraCanny.full_path()
-                        self.controlnet_cpds_path = BaseControlNetModelFiles.CPDS.full_path()
-                        self.clip_vision_path = BaseControlNetModelFiles.ImagePromptClipVIsion.full_path()
-                        self.ip_negative_path = BaseControlNetModelFiles.ImagePromptAdapterNegative.full_path()
-                        self.ip_adapter_path = BaseControlNetModelFiles.ImagePromptAdapterPlus.full_path()
-                        self.ip_adapter_face_path = BaseControlNetModelFiles.ImagePromptAdapterFace.full_path() """
-
 
         
         
 
-HooocusConfig = InitialHooocusConfig(**current_preset)
+HooocusConfig = ImageGenerationObject(**current_preset)
+
+DefaultConfig = ImageGenerationObject(**DEFAULT_PRESET)
 
 
 print(HooocusConfig.dict())
