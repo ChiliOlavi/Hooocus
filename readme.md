@@ -1,6 +1,6 @@
 # Hooocus (H3)
 <div align=center>
-<img src="https://github.com/Aavato-c/Hooocus/blob/main/media/logo.png">
+<img src="https://github.com/Aavato-c/Hooocus/blob/main/media/logo2.png">
 </div>
 
 ### A *H*eadless variant of Fooocus
