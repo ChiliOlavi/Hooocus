@@ -3,18 +3,18 @@ prepare_environment()
 
 import modules.async_worker as worker
 import ldm_patched.modules.model_management as model_management
-from utils.hooocus_utils import ImageGenerationSeed, EnhanceMaskCtrls, ControlNetImageTask, LoraTuple
+from utils.config import ImageGenerationObject, EnhanceMaskCtrls
 
 import time
 
-def generate_image(task: ImageGenerationSeed):
+def generate_image(task: ImageGenerationObject):
 
     try:
         with model_management.interrupt_processing_mutex:
             model_management.interrupt_processing = False
         
-        workhorse = worker
-        workhorse.async_tasks.append(task)
+        #workhorse = worker
+        #workhorse.async_tasks.append(task)
         finished = False
 
         while not finished:
