@@ -29,6 +29,7 @@ import ldm_patched.modules.controlnet
 import ldm_patched.modules.clip_vision
 
 import ldm_patched.modules.model_management
+from unavoided_global_hell.global_model_management import global_model_management
 from h3_utils.config import LAUNCH_ARGS as args
 
 import importlib
@@ -37,10 +38,12 @@ import ldm_patched.utils.path_utils
 import ldm_patched.utils.latent_visualization
 
 def before_node_execution():
-    ldm_patched.modules.model_management.throw_exception_if_processing_interrupted()
+    # GLOBAL VAR USAGE
+    global_model_management.throw_exception_if_processing_interrupted()
 
 def interrupt_processing(value=True):
-    ldm_patched.modules.model_management.interrupt_current_processing(value)
+    # GLOBAL VAR USAGE
+    global_model_management.interrupt_current_processing(value)
 
 MAX_RESOLUTION=8192
 
