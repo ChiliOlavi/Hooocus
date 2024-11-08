@@ -99,7 +99,7 @@ class GeneralArgs(BaseModel):
     min_seed: int = 0
     max_seed: int = 2**63 - 1
     
-    directm: bool = False
+    directml: bool = False
     disable_ipex_hijack: bool = False
     disable_xformers: bool = False
 
