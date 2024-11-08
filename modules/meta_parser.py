@@ -6,10 +6,10 @@ from pathlib import Path
 from PIL import Image
 
 import utils.config
-import modules.sdxl_styles
-from utils.flags import MetadataScheme, Performance, Steps
+import utils.sdxl_prompt_expansion_utils
+from utils.flags import Performance, Steps
 from utils.flags import SAMPLERS, CIVITAI_NO_KARRAS
-from utils.consts import HOOOCUS_VERSION
+from utils.config import HOOOCUS_VERSION, METADATA_SCHEME
 from modules.hash_cache import sha256_from_cache
 from modules.util import quote, unquote, extract_styles_from_prompt, is_json, get_file_from_folder_list
 
@@ -406,8 +406,8 @@ class A1111MetadataParser(MetadataParser):
         if 'raw_prompt' in data:
             data['prompt'] = data['raw_prompt']
             raw_prompt = data['raw_prompt'].replace("\n", ', ')
-            if metadata_prompt != raw_prompt and modules.sdxl_styles.fooocus_expansion not in found_styles:
-                found_styles.append(modules.sdxl_styles.fooocus_expansion)
+            if metadata_prompt != raw_prompt and utils.sdxl_prompt_expansion_utils.fooocus_expansion not in found_styles:
+                found_styles.append(utils.sdxl_prompt_expansion_utils.fooocus_expansion)
 
         if 'raw_negative_prompt' in data:
             data['negative_prompt'] = data['raw_negative_prompt']
