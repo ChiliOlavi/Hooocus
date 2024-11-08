@@ -62,3 +62,4 @@ Priorities:
 - [ ] Add documentation
 - [ ] Remove reduntant subdicts from LaunchArguments
 - [ ] Remove all global vars
+- [ ] Update MERGED_ARGS to be used everywhere, get rid of old args
