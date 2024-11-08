@@ -58,3 +58,8 @@ venvi
 __cache__/hash_cache.json
 .env
 utils/simple_requirements.txt
+ImageTaskProcessor.pdf
+logs/*.log
+modules/image_generation_utils.py
+utils/meta/graph.sh
+modules/image_generation_utils.py
