@@ -1,3 +1,5 @@
+from typing import List
+import numpy as np
 import torch
 import safetensors.torch as sf
 
@@ -8,8 +10,9 @@ from ldm_patched.modules.model_patcher import ModelPatcher
 from ldm_patched.modules.ops import manual_cast
 
 from extras.resampler import Resampler
-from modules.core import numpy_to_pytorch
+from modules.core import StableDiffusionModel, numpy_to_pytorch
 from modules.ops import use_patched_ops
+from utils.model_file_config import BaseControlNetTask
 
 
 SD_V12_CHANNELS = (
@@ -184,7 +187,7 @@ class IpaAdapterManagement:
 
     @torch.no_grad()
     @torch.inference_mode()
-    def preprocess(self, img, ip_adapter_path):
+    def preprocess(self, img: np.ndarray, ip_adapter_path: str):
         entry = self.ip_adapters[ip_adapter_path]
 
         ldm_patched.modules.model_management.load_model_gpu(self.clip_vision.patcher)
@@ -241,7 +244,7 @@ def clip_preprocess(image):
 
 @torch.no_grad()
 @torch.inference_mode()
-def patch_model(model, tasks):
+def patch_model(model: ModelPatcher, tasks: List[BaseControlNetTask]):
     new_model = model.clone()
 
     def make_attn_patcher(ip_index):
@@ -257,7 +260,11 @@ def patch_model(model, tasks):
             v = [value_attn2]
             b, _, _ = q.shape
 
-            for (cs, ucs), cn_stop, cn_weight in tasks:
+            for cn_task in tasks:
+                cs = cn_task.ip_conds
+                ucs = cn_task.ip_unconds
+                cn_stop = cn_task.stop
+                cn_weight = cn_task.weight
                 if current_step < cn_stop:
                     ip_k_c = cs[ip_index * 2].to(q)
                     ip_v_c = cs[ip_index * 2 + 1].to(q)
