@@ -20,7 +20,7 @@ from ldm_patched.modules.lora import model_lora_keys_unet, model_lora_keys_clip
 from h3_utils.path_configs import FolderPathsConfig
 
 path_embeddings = FolderPathsConfig.path_embeddings
-from unavoided_global_vars import (
+from unavoided_global_hell.unavoided_global_vars import (
     opEmptyLatentImage,
     opVAEDecode,
     opVAEEncode,
@@ -29,6 +29,8 @@ from unavoided_global_vars import (
     opControlNetApplyAdvanced,
     opFreeU,
 )
+
+from unavoided_global_hell.global_model_management import global_model_management
 
 
 class StableDiffusionModel:
@@ -71,14 +73,14 @@ class StableDiffusionModel:
 
         loras_to_load = []
 
-        for filename, weight in loras:
+        for _bool, filename, weight in loras:
             if filename == 'None':
                 continue
 
             if os.path.exists(filename):
                 lora_filename = filename
             else:
-                lora_filename = get_file_from_folder_list(filename, modules.config.paths_loras)
+                lora_filename = get_file_from_folder_list(filename, FolderPathsConfig.path_loras)
 
             if not os.path.exists(lora_filename):
                 print(f'Lora file not found: {lora_filename}')
@@ -221,7 +223,8 @@ VAE_approx_models = {}
 def get_previewer(model):
     global VAE_approx_models
 
-    from h3_utils.config import path_vae_approx
+    from h3_utils.path_configs import FolderPathsConfig
+    path_vae_approx = FolderPathsConfig.path_vae_approx
     is_sdxl = isinstance(model.model.latent_format, ldm_patched.modules.latent_formats.SDXL)
     vae_approx_filename = os.path.join(path_vae_approx, 'xlvaeapp.pth' if is_sdxl else 'vaeapp_sd15.pth')
 
@@ -291,7 +294,7 @@ def ksampler(model, positive, negative, latent, seed=None, steps=30, cfg=7.0, sa
         previewer_end = steps
 
     def callback(step, x0, x, total_steps):
-        ldm_patched.modules.model_management.throw_exception_if_processing_interrupted()
+        global_model_management.throw_exception_if_processing_interrupted()
         y = None
         if previewer is not None and not disable_preview:
             y = previewer(x0, previewer_start + step, previewer_end)
