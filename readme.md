@@ -1,4 +1,7 @@
 # Hooocus (H3)
+<div align=center>
+<img src="https://github.com/Aavato-c/Hooocus/blob/main/media/logo.png">
+</div>
 
 ### A *H*eadless variant of Fooocus
 
@@ -11,11 +14,13 @@ Hooocus (H3) is a headless variant of [Fooocus](https://github.com/lllyasviel/Fo
 Fooocus has included and automated [lots of inner optimizations and quality improvements](#tech_list). Where the Gradio UI may provide ease of use, the aim of this fork is to provide ease of automation. Ideally, one should be able to use the Fooocus log parameters as starting points for creating images with Hooocus. It started out of my own needs.
 
 Goals:
+
 - A simple HTTP-api for generating images
 - A lower level API improving on the existing one with e.g. adding pydantic validations
 - Removing gradio as a dependancy at some point
 
 Priorities:
+
 - Concentrate global state managment more neatly (now having flags, argvs, configs,     consts, globals, config-files etc)
 - Build a basic gradio-free workflow example
 
@@ -23,6 +28,7 @@ Status:
 Look into main.py for a usage example. It all boils down to using the `ImageGenerationObject` to create a "task" for the `ImageProcessor`. The ImageProcessor will then handle the generation of the image from ImageProcessor.generation_tasks -list.
 
 ## Usage (MacOs / Ubuntu)
+
 ``python3 -m venv venv``
 ``source venv/bin/activate``
 ``python3 -m pip install -r requirements_versions.txt``
@@ -49,14 +55,16 @@ Look into main.py for a usage example. It all boils down to using the `ImageGene
 12. Using automatic1111's method to normalize prompt emphasizing. This significantly improves results when users directly copy prompts from civitai.
 13. The joint swap system of the refiner now also supports img2img and upscale in a seamless way.
 14. CFG Scale and TSNR correction (tuned for SDXL) when CFG is bigger than 10.
+
 </details>
 
 ## Customization
-- TBA
-``
 
+- TBA
+  ``
 
 ## Current todo
+
 - [ ] Convert presets to new format including usage of bools isntead of -1
 - [ ] Isolate model managment and assaign cuda devices based on available devices
 - [ ] Implement api for generating images
