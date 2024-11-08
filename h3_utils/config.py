@@ -1,7 +1,8 @@
-from calendar import c
 import os
 import sys
 
+from cv2 import merge
+import pydantic
 from pydantic_core import from_json
 from torch import Tensor
 
@@ -17,7 +18,7 @@ sys.path.append(PARENT_DIR)
 
 import json
 import tempfile
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Iterable
 from enum import Enum
 from h3_utils.model_file_config import BaseControlNetTask
 from pydantic import BaseModel, Field
@@ -68,108 +69,18 @@ class GlobalEnv:
 HOOOCUS_VERSION = '0.5.0'
 METADATA_SCHEME = "Hooocus"
 
-class _GeneralArgs(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
-    
-    # ???
-    enable_auto_describe_image: bool = Field(False, description="Enables automatic description of uov and enhance image when prompt is empty.")
-    preview_option: LatentPreviewMethod = LatentPreviewMethod.NoPreviews
-    
-    disable_image_log: bool = Field(False, description="Prevent writing images and logs to the outputs folder.")
-    disable_analytics: bool = Field(False, description="Disables analytics for Gradio.")
-    disable_metadata: bool = Field(False, description="Disables saving metadata to images.")
-    disable_preset_download: bool = Field(False, description="Disables downloading models for presets.")
-    disable_enhance_output_sorting: bool = Field(False, description="Disables enhance output sorting for final image gallery.")
-    always_download_new_model: bool = Field(False, description="Always download newer models.")
-    rebuild_hash_cache: bool = Field(False, description="Generates missing model and LoRA hashes.")
-    
-    listen: str = "127.0.0.1"
-    port: int = 8188
-    disable_header_check: str = "false"
-    black_out_nsfw: bool = False
-    
-    temp_path_cleanup_on_launch: bool = Field(True, description="The temp path cleanup on launch to use.")
-    
-    web_upload_size: float = 100.0
-    hf_mirror: str = "https:/huggingface.co"
-    external_working_path: str = None
-    output_path: str = None
-    temp_path: str = None
-    cache_path: str = None
-    in_browser: bool = False
-    disable_in_browser: bool = False
-    gpu_device_id: Optional[int] = None
-    disable_attention_upcast: bool = False
-    min_seed: int = 0
-    max_seed: int = 2**63 - 1
-    
-    directml: bool = False
-    disable_ipex_hijack: bool = False
-    disable_xformers: bool = False
 
-    pytorch_deterministic: bool = False
-    disable_server_info: bool = False
-
-class _CmArgs(BaseModel):
-    async_cuda_allocation: bool = False
-    disable_async_cuda_allocation: bool = False
-
-class _FpArgs(BaseModel):
-    all_in_fp32: bool = False
-    all_in_fp16: bool = False
-
-class _FpUnetArgs(BaseModel):
-    unet_in_bf16: bool = False
-    unet_in_fp16: bool = False
-    unet_in_fp8_e4m3fn: bool = False
-    unet_in_fp8_e5m2: bool = False
-
-class _VaeInFpArgs(BaseModel):
-    # Mutually exclusive group
-    vae_in_fp16: bool = False
-    vae_in_fp32: bool = False
-    vae_in_bf16: bool = False
-    vae_in_cpu: bool = False
-
-class _FPTEArgs(BaseModel):
-    clip_in_fp8_e4m3fn: bool = False
-    clip_in_fp8_e5m2: bool = False
-    clip_in_fp16: bool = False
-    clip_in_fp32: bool = False
-
-class _AttentionArgs(BaseModel):
-    attention_split: bool = False
-    attention_quad: bool = False
-    attention_pytorch: bool = False
-
-class _VramArgs(BaseModel):
-    always_cpu: int = -1
-    always_gpu: int = -1
-    always_high_vram: int = -1
-    always_normal_vram: int = -1
-    always_low_vram: int = -1
-    always_no_vram: int = -1
-    always_offload_from_vram: bool = False
 
 class _LAUNCH_ARGS(BaseModel):
     # Modify the initial values here
     class Config:
         arbitrary_types_allowed = True
 
-    GeneralArgs: _GeneralArgs = _GeneralArgs()
-    VramArgs: _VramArgs = _VramArgs()
-    AttentionArgs: _AttentionArgs = _AttentionArgs()
-    FPTEArgs: _FPTEArgs = _FPTEArgs()
-    VaeInFpArgs: _VaeInFpArgs = _VaeInFpArgs()
-    FpUnetArgs: _FpUnetArgs = _FpUnetArgs()
-    FpArgs: _FpArgs = _FpArgs()
-    CmArgs: _CmArgs = _CmArgs()
-    GeneralArgs: _GeneralArgs = _GeneralArgs()
-    
-    
+   
+    # General args
     enable_auto_describe_image: bool = Field(False, description="Enables automatic description of uov and enhance image when prompt is empty.")
     preview_option: LatentPreviewMethod = LatentPreviewMethod.NoPreviews
+    wildcards_max_bfs_depth: int = 64
     disable_image_log: bool = Field(False, description="Prevent writing images and logs to the outputs folder.")
     disable_analytics: bool = Field(False, description="Disables analytics for Gradio.")
     disable_metadata: bool = Field(False, description="Disables saving metadata to images.")
@@ -177,57 +88,80 @@ class _LAUNCH_ARGS(BaseModel):
     disable_enhance_output_sorting: bool = Field(False, description="Disables enhance output sorting for final image gallery.")
     always_download_new_model: bool = Field(False, description="Always download newer models.")
     rebuild_hash_cache: bool = Field(False, description="Generates missing model and LoRA hashes.")
+    temp_path_cleanup_on_launch: bool = Field(True, description="The temp path cleanup on launch to use.")
+    
+    # Server args
     listen: str = "127.0.0.1"
     port: int = 8188
     disable_header_check: str = "false"
-    black_out_nsfw: bool = False
-    temp_path_cleanup_on_launch: bool = Field(True, description="The temp path cleanup on launch to use.")
+    disable_server_info: bool = False
+    
+    # Etc
     web_upload_size: float = 100.0
     hf_mirror: str = "https:/huggingface.co"
     external_working_path: str = None
-    output_path: str = None
     temp_path: str = None
     cache_path: str = None
     in_browser: bool = False
     disable_in_browser: bool = False
-    gpu_device_id: Optional[int] = None
-    disable_attention_upcast: bool = False
+
+    # Global imagegen
     min_seed: int = 0
     max_seed: int = 2**63 - 1
+    black_out_nsfw: bool = False
+    disable_attention_upcast: bool = False
+    gpu_device_id: Optional[int] = None
+    output_path: str = None
     directml: bool = False
     disable_ipex_hijack: bool = False
     disable_xformers: bool = False
     pytorch_deterministic: bool = False
-    disable_server_info: bool = False
+    
+
+    # CMD args
     async_cuda_allocation: bool = False
     disable_async_cuda_allocation: bool = False
+
+    # Model args
     all_in_fp32: bool = False
     all_in_fp16: bool = False
+
+    # Unet args
     unet_in_bf16: bool = False
     unet_in_fp16: bool = False
     unet_in_fp8_e4m3fn: bool = False
     unet_in_fp8_e5m2: bool = False
+
+    # VAE args
     vae_in_fp16: bool = False
     vae_in_fp32: bool = False
     vae_in_bf16: bool = False
     vae_in_cpu: bool = False
+
+    # FPTEArgs
     clip_in_fp8_e4m3fn: bool = False
     clip_in_fp8_e5m2: bool = False
     clip_in_fp16: bool = False
     clip_in_fp32: bool = False
+
+    # AttentionArgs
     attention_split: bool = False
     attention_quad: bool = False
     attention_pytorch: bool = False
-    always_cpu: int = -1
-    always_gpu: int = -1
+
+    # VramArgs
+    always_cpu: int = False
+    always_gpu: int = True
     always_high_vram: int = -1
-    always_normal_vram: int = -1
+    always_normal_vram: int = 1
     always_low_vram: int = -1
     always_no_vram: int = -1
     always_offload_from_vram: bool = False
 
 
+
 LAUNCH_ARGS = _LAUNCH_ARGS()
+
 class FilePathConfig:
     config_path = 'h3_utils/config.json'
     hash_cache_path = f'{PARENT_DIR}/__cache__/hash_cache.json'
@@ -257,7 +191,6 @@ class OverWriteControls(BaseModel):
 
 class DeveloperOptions(BaseModel):
      # ?
-    read_wildcards_in_order: bool = False
     metadata_created_by: str = Field("", description="The metadata created by to use.")
     metadata_scheme: str = Field(METADATA_SCHEME, description="The default metadata scheme to use.")
     debugging_cn_preprocessor: bool = False
@@ -341,12 +274,13 @@ class _InitialImageGenerationParams(BaseModel):
     prompt_negative: str = Field(DEFAULT_PRESET["prompt_negative"], description="The default negative prompt to use.")
     prompt: Optional[str] = Field(None, description="The default prompt to use.")
     negative_prompt: str = ""
+    read_wildcards_in_order: bool = False
 
     width: Optional[int] = Field(None, description="The default width to use.")
     height: Optional[int] = Field(None, description="The default height to use.")
     
     sample_sharpness: float = Field(DEFAULT_PRESET["sample_sharpness"], description="The default sample sharpness to use.")
-    seed: int = random.randint(LAUNCH_ARGS.GeneralArgs.min_seed, LAUNCH_ARGS.GeneralArgs.max_seed)
+    seed: int = random.randint(LAUNCH_ARGS.min_seed, LAUNCH_ARGS.max_seed)
     #sharpness: float = Field(2.0, description="Sharpness", ge=0.0, le=30.0)
     sampler_name: KSAMPLER = DEFAULT_PRESET["sampler"]
     scheduler_name: str = DEFAULT_PRESET["scheduler"]
@@ -402,7 +336,7 @@ class _InitialImageGenerationParams(BaseModel):
     inpaint_options: Optional[InptaintOptions] = None
     controlnet_tasks: Optional[List[BaseControlNetTask]] = None
     overwrite_controls: Optional[OverWriteControls] = None
-    developer_options: Optional[DeveloperOptions] = None
+    developer_options: Optional[DeveloperOptions] = DeveloperOptions()
     
     #should_describe_apply_prompts: bool = Field(True, description="The default describe apply prompts checkbox to use.")
     describe_content_type: Optional[List[str]] = Field([DESCRIBE_TYPE_PHOTO], description="The default describe content type to use.")
@@ -445,11 +379,9 @@ class TaskletObject(BaseModel):
     task_seed: int 
     task_prompt: str
     task_negative_prompt: str
-    positive_basic_workloads: List[str]
-    positive_basic_workloads: List[str]
+    positive_basic_workloads: Optional[List[str]] = []
+    negative_basic_workloads: Optional[List[str]] = []
     expansion: str
-    positive_cond: Any = None
-    negative_cond: Any = None
     # [[torch.cat(cond_list, dim=1), {"pooled_output": pooled_acc}]]
     encoded_positive_cond: Optional[Tuple[Tensor, Dict[str, Tensor]]] = None
     encoded_negative_cond: Optional[Tuple[Tensor, Dict[str, Tensor]]] = None

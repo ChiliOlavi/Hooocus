@@ -491,7 +491,7 @@ def cleanup_prompt(prompt):
 
 
 def apply_wildcards(wildcard_text, rng, i, read_wildcards_in_order) -> str:
-    for _ in range(h3_utils.config.wildcards_max_bfs_depth):
+    for _ in range(h3_utils.config.LAUNCH_ARGS.wildcards_max_bfs_depth):
         placeholders = re.findall(r'__([\w-]+)__', wildcard_text)
         if len(placeholders) == 0:
             return wildcard_text

@@ -68,19 +68,19 @@ def prepare_environment():
         args=LAUNCH_ARGS,
     ) """
 
-    if args.GeneralArgs.gpu_device_id is not None:
+    if args.gpu_device_id is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu_device_id)
-        print("Set device to:", args.GeneralArgs.gpu_device_id)
+        print("Set device to:", args.gpu_device_id)
 
     if args.hf_mirror is not None:
         os.environ['HF_MIRROR'] = str(args.hf_mirror)
-        print("Set hf_mirror to:", args.GeneralArgs.hf_mirror)
+        print("Set hf_mirror to:", args.hf_mirror)
 
     os.environ["U2NET_HOME"] = FolderPathsConfig.path_inpaint
 
     os.environ['GRADIO_TEMP_DIR'] = FolderPathsConfig.default_temp_path
 
-    if args.GeneralArgs.temp_path_cleanup_on_launch:
+    if args.temp_path_cleanup_on_launch:
         print(f'[Cleanup] Attempting to delete content of temp dir {FolderPathsConfig.default_temp_path}')
         result = delete_folder_content(FolderPathsConfig.default_temp_path, '[Cleanup] ')
         if result:
@@ -101,7 +101,7 @@ def prepare_environment():
     return
 
 
-def download_models(default_model, previous_default_models, checkpoint_downloads, embeddings_downloads, lora_downloads, vae_downloads, args: LAUNCH_ARGS):
+def download_models(default_model, previous_default_models, checkpoint_downloads, embeddings_downloads, lora_downloads, vae_downloads, args=args):
     from modules.util import get_file_from_folder_list
 
     for file_name, url in vae_approx_filenames:

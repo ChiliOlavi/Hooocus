@@ -38,12 +38,12 @@ total_vram = 0
 lowvram_available = True
 xpu_available = False
 
-if args.GeneralArgs.pytorch_deterministic:
+if args.pytorch_deterministic:
     print("Using deterministic algorithms for pytorch")
     torch.use_deterministic_algorithms(True, warn_only=True)
 
 directml_enabled = False
-if args.GeneralArgs.directml is not None and importlib.util.find_spec("torch_directml") is not None:
+if args.directml is not None and importlib.util.find_spec("torch_directml") is not None:
     import torch_directml
     directml_enabled = True
     device_index = args.directml
@@ -67,9 +67,9 @@ try:
 except:
     pass
 
-if args.VramArgs.always_cpu:
-    if args.VramArgs.always_cpu > 0:
-        torch.set_num_threads(args.VramArgs.always_cpu)
+if args.always_cpu:
+    if args.always_cpu > 0:
+        torch.set_num_threads(args.always_cpu)
     print(f"Running on {torch.get_num_threads()} CPU threads")
     cpu_state = CPUState.CPU
 
@@ -129,7 +129,7 @@ def get_total_memory(dev=None, torch_total_too=False):
 total_vram = get_total_memory(get_torch_device()) / (1024 * 1024)
 total_ram = psutil.virtual_memory().total / (1024 * 1024)
 print("Total VRAM {:0.0f} MB, total RAM {:0.0f} MB".format(total_vram, total_ram))
-if not args.VramArgs.always_normal_vram and not args.VramArgs.always_cpu:
+if not args.always_normal_vram and not args.always_cpu:
     if lowvram_available and total_vram <= 4096:
         print("Trying to enable lowvram mode because your GPU seems to have 4GB or less. If you don't want this use: --always-normal-vram")
         set_vram_to = VRAMState.LOW_VRAM
@@ -141,7 +141,7 @@ except:
 
 XFORMERS_VERSION = ""
 XFORMERS_ENABLED_VAE = True
-if args.GeneralArgs.disable_xformers:
+if args.disable_xformers:
     XFORMERS_IS_AVAILABLE = False
 else:
     if importlib.util.find_spec("xformers") is not None:
@@ -174,7 +174,7 @@ def is_nvidia():
     return False
 
 ENABLE_PYTORCH_ATTENTION = False
-if args.AttentionArgs.attention_pytorch:
+if args.attention_pytorch:
     ENABLE_PYTORCH_ATTENTION = True
     XFORMERS_IS_AVAILABLE = False
 
@@ -189,7 +189,7 @@ try:
             if torch.cuda.is_bf16_supported() and torch.cuda.get_device_properties(torch.cuda.current_device()).major >= 8:
                 VAE_DTYPE = torch.bfloat16
     if is_intel_xpu():
-        if args.AttentionArgs.attention_split == False and args.AttentionArgs.attention_quad == False:
+        if args.attention_split == False and args.attention_quad == False:
             ENABLE_PYTORCH_ATTENTION = True
 except:
     pass
@@ -197,14 +197,14 @@ except:
 if is_intel_xpu():
     VAE_DTYPE = torch.bfloat16
 
-if args.VaeInFpArgs.vae_in_cpu:
+if args.vae_in_cpu:
     VAE_DTYPE = torch.float32
 
-if args.VaeInFpArgs.vae_in_fp16:
+if args.vae_in_fp16:
     VAE_DTYPE = torch.float16
-elif args.VaeInFpArgs.vae_in_bf16:
+elif args.vae_in_bf16:
     VAE_DTYPE = torch.bfloat16
-elif args.VaeInFpArgs.vae_in_fp32:
+elif args.vae_in_fp32:
     VAE_DTYPE = torch.float32
 
 
@@ -213,21 +213,21 @@ if ENABLE_PYTORCH_ATTENTION:
     torch.backends.cuda.enable_flash_sdp(True)
     torch.backends.cuda.enable_mem_efficient_sdp(True)
 
-if args.VramArgs.always_low_vram:
+if args.always_low_vram:
     set_vram_to = VRAMState.LOW_VRAM
     lowvram_available = True
-elif args.VramArgs.always_no_vram:
+elif args.always_no_vram:
     set_vram_to = VRAMState.NO_VRAM
-elif args.VramArgs.always_high_vram or args.VramArgs.always_gpu:
+elif args.always_high_vram or args.always_gpu:
     vram_state = VRAMState.HIGH_VRAM
 
 FORCE_FP32 = False
 FORCE_FP16 = False
-if args.FpArgs.all_in_fp32:
+if args.all_in_fp32:
     print("Forcing FP32, if this improves things please report it.")
     FORCE_FP32 = True
 
-if args.FpArgs.all_in_fp16:
+if args.all_in_fp16:
     print("Forcing FP16.")
     FORCE_FP16 = True
 
@@ -244,7 +244,7 @@ if cpu_state == CPUState.MPS:
 
 print(f"Set vram state to: {vram_state.name}")
 
-if args.VramArgs.always_offload_from_vram:
+if args.always_offload_from_vram:
     print("Always offload VRAM")
 
 def get_torch_device_name(device):
@@ -327,7 +327,7 @@ class LoadedModel:
 
             self.model_accelerated = True
 
-        if is_intel_xpu() and not args.GeneralArgs.disable_ipex_hijack:
+        if is_intel_xpu() and not args.disable_ipex_hijack:
             self.real_model = torch.xpu.optimize(self.real_model.eval(), inplace=True, auto_kernel_selection=True, graph_mode=True)
 
         return self.real_model
@@ -363,7 +363,7 @@ def unload_model_clones(model):
 def free_memory(memory_required, device, keep_loaded=[]):
     unloaded_model = False
     for i in range(len(current_loaded_models) -1, -1, -1):
-        if not args.VramArgs.always_offload_from_vram:
+        if not args.always_offload_from_vram:
             if get_free_memory(device) > memory_required:
                 break
         shift_model = current_loaded_models[i]
@@ -484,7 +484,7 @@ def unet_inital_load_device(parameters, dtype):
         return torch_dev
 
     cpu_dev = torch.device("cpu")
-    if args.VramArgs.always_offload_from_vram:
+    if args.always_offload_from_vram:
         return cpu_dev
 
     model_size = dtype_size(dtype) * parameters
@@ -497,13 +497,13 @@ def unet_inital_load_device(parameters, dtype):
         return cpu_dev
 
 def unet_dtype(device=None, model_params=0):
-    if args.FpUnetArgs.unet_in_bf16:
+    if args.unet_in_bf16:
         return torch.bfloat16
-    if args.FpUnetArgs.unet_in_fp16:
+    if args.unet_in_fp16:
         return torch.float16
-    if args.FpUnetArgs.unet_in_fp8_e4m3fn:
+    if args.unet_in_fp8_e4m3fn:
         return torch.float8_e4m3fn
-    if args.FpUnetArgs.unet_in_fp8_e5m2:
+    if args.unet_in_fp8_e5m2:
         return torch.float8_e5m2
     if should_use_fp16(device=device, model_params=model_params):
         return torch.float16
@@ -524,13 +524,13 @@ def unet_manual_cast(weight_dtype, inference_device):
         return torch.float32
 
 def text_encoder_offload_device():
-    if args.VramArgs.always_gpu:
+    if args.always_gpu:
         return get_torch_device()
     else:
         return torch.device("cpu")
 
 def text_encoder_device():
-    if args.VramArgs.always_gpu:
+    if args.always_gpu:
         return get_torch_device()
     elif vram_state == VRAMState.HIGH_VRAM or vram_state == VRAMState.NORMAL_VRAM:
         if is_intel_xpu():
@@ -543,13 +543,13 @@ def text_encoder_device():
         return torch.device("cpu")
 
 def text_encoder_dtype(device=None):
-    if args.FPTEArgs.clip_in_fp8_e4m3fn:
+    if args.clip_in_fp8_e4m3fn:
         return torch.float8_e4m3fn
-    elif args.FPTEArgs.clip_in_fp8_e5m2:
+    elif args.clip_in_fp8_e5m2:
         return torch.float8_e5m2
-    elif args.FPTEArgs.clip_in_fp16:
+    elif args.clip_in_fp16:
         return torch.float16
-    elif args.FPTEArgs.clip_in_fp32:
+    elif args.clip_in_fp32:
         return torch.float32
 
     if is_device_cpu(device):
@@ -561,18 +561,18 @@ def text_encoder_dtype(device=None):
         return torch.float32
 
 def intermediate_device():
-    if args.VramArgs.always_gpu:
+    if args.always_gpu:
         return get_torch_device()
     else:
         return torch.device("cpu")
 
 def vae_device():
-    if args.VaeInFpArgs.vae_in_cpu:
+    if args.vae_in_cpu:
         return torch.device("cpu")
     return get_torch_device()
 
 def vae_offload_device():
-    if args.VramArgs.always_gpu:
+    if args.always_gpu:
         return get_torch_device()
     else:
         return torch.device("cpu")
@@ -783,31 +783,3 @@ def unload_all_models():
 def resolve_lowvram_weight(weight, model, key): #TODO: remove
     return weight
 
-#TODO: might be cleaner to put this somewhere else
-import threading
-
-class InterruptProcessingException(Exception):
-    pass
-
-interrupt_processing_mutex = threading.RLock()
-
-interrupt_processing = False
-def interrupt_current_processing(value=True):
-    global interrupt_processing
-    global interrupt_processing_mutex
-    with interrupt_processing_mutex:
-        interrupt_processing = value
-
-def processing_interrupted():
-    global interrupt_processing
-    global interrupt_processing_mutex
-    with interrupt_processing_mutex:
-        return interrupt_processing
-
-def throw_exception_if_processing_interrupted():
-    global interrupt_processing
-    global interrupt_processing_mutex
-    with interrupt_processing_mutex:
-        if interrupt_processing:
-            interrupt_processing = False
-            raise InterruptProcessingException()
