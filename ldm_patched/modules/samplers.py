@@ -270,7 +270,7 @@ class CFGNoisePredictor(torch.nn.Module):
         super().__init__()
         self.inner_model = model
     def apply_model(self, x, timestep, cond, uncond, cond_scale, model_options={}, seed=None):
-        out = sampling_function(self.inner_model, x, timestep, uncond, cond, cond_scale, model_options=model_options, seed=seed)
+        out = sampling_function(self, self.inner_model, x, timestep, uncond, cond, cond_scale, model_options=model_options, seed=seed)
         return out
     def forward(self, *args, **kwargs):
         return self.apply_model(*args, **kwargs)
