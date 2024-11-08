@@ -1,12 +1,12 @@
-# Hooocus
+# Hooocus (H3)
 
 ### A *H*eadless variant of Fooocus
 
-`v. 0.5.0`
+`v. 0.5.1`
 
 > **This project is very much in a development phase. If you're just looking for a way to create images, use [the original Fooocus](https://github.com/lllyasviel/Fooocus).**
 
-Hooocus is a headless variant of [Fooocus](https://github.com/lllyasviel/Fooocus), a wonderful creation started by [lllyasviel](https://github.com/lllyasviel)
+Hooocus (H3) is a headless variant of [Fooocus](https://github.com/lllyasviel/Fooocus), a wonderful creation started by [lllyasviel](https://github.com/lllyasviel)
 
 Fooocus has included and automated [lots of inner optimizations and quality improvements](#tech_list). Where the Gradio UI may provide ease of use, the aim of this fork is to provide ease of automation. Ideally, one should be able to use the Fooocus log parameters as starting points for creating images with Hooocus. It started out of my own needs.
 
@@ -16,9 +16,11 @@ Goals:
 - Removing gradio as a dependancy at some point
 
 Priorities:
-- Remove all the 146 global vars lingering in the source
 - Concentrate global state managment more neatly (now having flags, argvs, configs,     consts, globals, config-files etc)
 - Build a basic gradio-free workflow example
+
+Status:
+Look into main.py for a usage example. It all boils down to using the `ImageGenerationObject` to create a "task" for the `ImageProcessor`. The ImageProcessor will then handle the generation of the image from ImageProcessor.generation_tasks -list.
 
 ## Usage (MacOs / Ubuntu)
 ``python3 -m venv venv``
@@ -26,7 +28,7 @@ Priorities:
 ``python3 -m pip install -r requirements_versions.txt``
 --> A work in progress....
 
-## List of "Hidden" Tricks already present in Fooocus
+## Some of the "Hidden" tricks that were present in Fooocus that are also included in H3
 
 <a name="tech_list"></a>
 
@@ -63,3 +65,5 @@ Priorities:
 - [ ] Remove reduntant subdicts from LaunchArguments
 - [ ] Remove all global vars
 - [ ] Update MERGED_ARGS to be used everywhere, get rid of old args
+- [ ] Get a thread for viewing images. Some kind of a streaming POST-endpoint for viewing images would be nice, I'll build it later.
+- [ ] Flux support

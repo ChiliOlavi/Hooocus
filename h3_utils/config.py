@@ -64,7 +64,7 @@ class GlobalEnv:
             os.environ[_key] = str(value)
 
 
-HOOOCUS_VERSION = '0.5.0'
+HOOOCUS_VERSION = '0.5.1'
 METADATA_SCHEME = "Hooocus"
 
 
