@@ -73,10 +73,9 @@ class BatchedBrownianTree:
         if seed is None:
             seed = torch.randint(0, 2 ** 63 - 1, []).item()
         self.batched = True
-        try:
-            assert len(seed) == x.shape[0]
+        if type(seed) != int:
             w0 = w0[0]
-        except TypeError:
+        else:
             seed = [seed]
             self.batched = False
         if self.cpu_tree:
