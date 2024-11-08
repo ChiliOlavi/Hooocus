@@ -1,6 +1,9 @@
 import modules.core as core
 import os
 import sys
+
+from utils import config
+from utils.path_configs import FolderPathsConfig
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import torch
@@ -16,7 +19,7 @@ from extras.expansion import FooocusExpansion
 from ldm_patched.modules.model_base import SDXL, SDXLRefiner
 from modules.sample_hijack import clip_separate
 from modules.util import get_file_from_folder_list, get_enabled_loras
-from utils.config import GLOBAL_CONFIG, PathsConfig
+from utils.config import LAUNCH_ARGS
 
 from utils.logging_util import LoggingUtil
 
@@ -73,11 +76,11 @@ class DefaultPipeline:
     @torch.no_grad()
     @torch.inference_mode()
     def refresh_base_model (self, name, vae_name=None):
-        filename = get_file_from_folder_list(name, utils.config.PathsConfig.path_checkpoints.value)
+        filename = get_file_from_folder_list(name, FolderPathsConfig.path_checkpoints.value)
 
         vae_filename = None
-        if vae_name is not None and vae_name != GLOBAL_CONFIG.default_vae:
-            vae_filename = get_file_from_folder_list(vae_name, utils.config.PathsConfig.path_vae.value)
+        if vae_name is not None and vae_name != config.DefaultConfig.vae_name:
+            vae_filename = get_file_from_folder_list(vae_name, FolderPathsConfig.path_vae.value)
 
         if self.model_base.filename == filename and self.model_base.vae_filename == vae_filename:
             return
@@ -94,7 +97,7 @@ class DefaultPipeline:
             print(f'Refiner unloaded.')
             return
         
-        filename = get_file_from_folder_list(name, PathsConfig.path_checkpoints.value)
+        filename = get_file_from_folder_list(name, FolderPathsConfig.path_checkpoints.value)
         
         if self.model_refiner.filename == filename:
             return
