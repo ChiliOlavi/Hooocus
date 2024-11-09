@@ -85,6 +85,7 @@ Look into main.py for a usage example. It all boils down to using the `ImageGene
 - [ ] Progress bar management, move to tqdm
 - [ ] Remove hanging code
 - [ ] Improve memory cleanup
+- [ ] Figure out global interrupt mutex. Redundant for now as the app is single threaded
 
 
 # Long term nice to haves
