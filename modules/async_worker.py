@@ -161,8 +161,8 @@ class ImageTaskProcessor:
 
     # OK
     def process_tasklet(_self, prepared_task: config.TaskletObject):
-        parent_task: config.ImageGenerationObject = _self.generation_task
         """Processes a single image generation tasklet."""
+        parent_task: config.ImageGenerationObject = _self.generation_task
 
         _self.final_scheduler_name = _self.patch_samplers()
         _self.update_progress(f"Final scheduler: {_self.final_scheduler_name}")

@@ -43,8 +43,6 @@ class _EnumFolderPaths(Enum):
     path_outputs: str = "./outputs"
 
 
-    
-
 
 _folder_path_config = _EnumFolderPaths
 for path in _folder_path_config:
