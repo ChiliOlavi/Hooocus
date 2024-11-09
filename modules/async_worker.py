@@ -253,6 +253,7 @@ class ImageTaskProcessor:
     def interrupt_if_needed(self):
         """Interrupts the current processing if the last stop is not False."""
         if self.processing:
+            # GLOBAL VAR CALL
             global_model_management.interrupt_current_processing()
             self.processing = False
 
