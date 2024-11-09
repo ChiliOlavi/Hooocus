@@ -75,3 +75,20 @@ Look into main.py for a usage example. It all boils down to using the `ImageGene
 - [ ] Update MERGED_ARGS to be used everywhere, get rid of old args
 - [ ] Get a thread for viewing images. Some kind of a streaming POST-endpoint for viewing images would be nice, I'll build it later.
 - [ ] Flux support
+- [ ] Isolate model management
+- [ ] Isolate patch insertion
+- [ ] Multi-gpu support using accelerate
+- [ ] Automatic configuration on the first run
+- [ ] Config rewrtie (isolate launch args to their own file)
+- [ ] Api with a streaming response and in memory image stream 
+- [ ] Auth for the api
+- [ ] Progress bar management, move to tqdm
+- [ ] Remove hanging code
+- [ ] Improve memory cleanup
+
+
+# Long term nice to haves
+- [ ] Dockerize
+
+
+### API roadmap
