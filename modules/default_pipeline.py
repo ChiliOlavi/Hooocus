@@ -7,17 +7,17 @@ from h3_utils.path_configs import FolderPathsConfig
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import torch
-import modules.patch
+import modules.patch_modules.patch
 import h3_utils.config
 import h3_utils.flags
 import ldm_patched.modules.model_management
 import ldm_patched.modules.latent_formats
-import modules.inpaint_worker
+import modules.imagen_utils.inpaint_worker
 import extras.vae_interpose as vae_interpose
 from extras.expansion import FooocusExpansion
 
 from ldm_patched.modules.model_base import SDXL, SDXLRefiner
-from modules.sample_hijack import clip_separate
+from modules.imagen_utils.imagen_patch_utils.sample_hijack import clip_separate
 from modules.util import get_file_from_folder_list, get_enabled_loras
 from h3_utils.config import LAUNCH_ARGS, DefaultConfigImageGen
 from h3_utils.logging_util import LoggingUtil
@@ -338,7 +338,7 @@ class DefaultPipeline:
         tiled: bool = False,
         cfg_scale:float = 7.0,
         refiner_swap_method: str = "joint",
-        inpaintworker: modules.inpaint_worker.InpaintWorker = None,
+        inpaintworker: modules.imagen_utils.inpaint_worker.InpaintWorker = None,
         disable_preview=False):
 
         self.target_model = self.final_model
@@ -394,7 +394,7 @@ class DefaultPipeline:
         sigma_max = float(sigma_max.cpu().numpy())
         print(f'[Sampler] sigma_min = {sigma_min}, sigma_max = {sigma_max}')
 
-        modules.patch.BrownianTreeNoiseSamplerPatched.global_init(
+        modules.patch_modules.patch.BrownianTreeNoiseSamplerPatched.global_init(
             initial_latent['samples'].to(ldm_patched.modules.model_management.get_torch_device()),
             sigma_min, sigma_max, seed=image_seed, cpu=False)
 

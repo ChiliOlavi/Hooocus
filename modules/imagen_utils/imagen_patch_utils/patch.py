@@ -7,11 +7,11 @@ import math
 import ldm_patched.modules.model_base
 import ldm_patched.ldm.modules.diffusionmodules.openaimodel
 import ldm_patched.modules.model_management
-import modules.anisotropic as anisotropic
+import modules.imagen_utils.anisotropic as anisotropic
 import ldm_patched.ldm.modules.attention
 import ldm_patched.k_diffusion.sampling
 import ldm_patched.modules.sd1_clip
-import modules.inpaint_worker as inpaint_worker
+import modules.imagen_utils.inpaint_worker as inpaint_worker
 import ldm_patched.ldm.modules.diffusionmodules.openaimodel
 import ldm_patched.ldm.modules.diffusionmodules.model
 import ldm_patched.modules.sd
@@ -27,8 +27,8 @@ from h3_utils.config import LAUNCH_ARGS
 from ldm_patched.modules.samplers import calc_cond_uncond_batch
 from ldm_patched.k_diffusion.sampling import BatchedBrownianTree
 from ldm_patched.ldm.modules.diffusionmodules.openaimodel import forward_timestep_embed, apply_control
-from modules.patch_precision import patch_all_precision
-from modules.patch_clip import patch_all_clip
+from modules.patch_modules.patch_precision import patch_all_precision
+from modules.patch_modules.patch_clip import patch_all_clip
 from pydantic import BaseModel
 
 from unavoided_global_hell.unavoided_global_vars import (

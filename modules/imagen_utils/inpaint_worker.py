@@ -3,7 +3,7 @@ import numpy as np
 
 from PIL import Image, ImageFilter
 from modules.util import resample_image, set_image_shape_ceil, get_image_shape_ceil
-from modules.upscaler import perform_upscale
+from modules.imagen_utils.upscale.upscaler import perform_upscale
 import cv2
 
 

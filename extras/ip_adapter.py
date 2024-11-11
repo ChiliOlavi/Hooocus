@@ -11,7 +11,7 @@ from ldm_patched.modules.ops import manual_cast
 
 from extras.resampler import Resampler
 from modules.core import StableDiffusionModel, numpy_to_pytorch
-from modules.ops import use_patched_ops
+from modules.patch_modules.ops import use_patched_ops
 from h3_utils.model_file_config import BaseControlNetTask
 
 

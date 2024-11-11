@@ -12,7 +12,7 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
-from modules.model_loader import load_file_from_url
+from modules.model_file_utils.model_loader import load_file_from_url
 from h3_utils.path_configs import FolderPathsConfig
 from h3_utils.flags import PerformanceLoRA
 

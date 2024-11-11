@@ -7,7 +7,7 @@ import urllib.parse
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 from h3_utils.flags import OutputFormat
-from modules.meta_parser import MetadataParser, get_exif
+from wasteland.meta_parser import MetadataParser, get_exif
 from modules.util import generate_temp_filename
 
 log_cache = {}

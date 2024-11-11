@@ -17,7 +17,7 @@ import onnxruntime as ort
 from PIL import Image
 from onnxruntime import InferenceSession
 from h3_utils.config import path_clip_vision
-from modules.model_loader import load_file_from_url
+from modules.model_file_utils.model_loader import load_file_from_url
 
 
 global_model = None

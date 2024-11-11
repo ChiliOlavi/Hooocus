@@ -10,7 +10,7 @@ import h3_utils.sdxl_prompt_expansion_utils
 from h3_utils.flags import Performance, Steps
 from h3_utils.flags import SAMPLERS, CIVITAI_NO_KARRAS
 from h3_utils.config import HOOOCUS_VERSION, METADATA_SCHEME
-from modules.hash_cache import sha256_from_cache
+from modules.model_file_utils.hash_cache import sha256_from_cache
 from modules.util import quote, unquote, extract_styles_from_prompt, is_json, get_file_from_folder_list
 
 re_param_code = r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)'
