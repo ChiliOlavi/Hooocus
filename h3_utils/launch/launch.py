@@ -1,15 +1,16 @@
 import os
 import sys
 
+# Calculate the root directory of the project by splitting the path at "h3_utils"
 ROOT_DIR = os.path.abspath(__file__).split("h3_utils")[0]
 sys.path.append(ROOT_DIR)
 
 import ssl
 import platform
 
-from modules.hash_cache import init_cache, load_cache_from_file
+from modules.model_file_utils.hash_cache import init_cache, load_cache_from_file
 from h3_utils.launch.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
-from modules.model_loader import load_file_from_url
+from modules.model_file_utils.model_loader import load_file_from_url
 from h3_utils.config import HOOOCUS_VERSION, GlobalEnv, LAUNCH_ARGS
 from h3_utils.flags import LORA_FILENAMES, MODEL_FILENAMES
 from h3_utils.path_configs import FolderPathsConfig
@@ -38,14 +39,17 @@ def prepare_environment():
                                    f"pip install torch==2.1.0 torchvision==0.16.0 --extra-index-url {torch_index_url}")
     requirements_file = os.environ.get('REQS_FILE', "h3_utils/requirements_versions.txt")
 
-    print(f"Python {sys.version}")
-    print(f"Hooocus version: {HOOOCUS_VERSION}")
+    log.info(f"Python {sys.version}")
+    log.info(f"Hooocus version: {HOOOCUS_VERSION}")
 
-    if GlobalEnv.REINSTALL_ALL or not is_installed("torch") or not is_installed("torchvision"):
+    torch_installed = is_installed("torch")
+    torchvision_installed = is_installed("torchvision")
+    if GlobalEnv.REINSTALL_ALL or not torch_installed or not torchvision_installed:
         run(f'"{python}" -m {torch_command}', "Installing torch and torchvision", "Couldn't install torch", live=True)
 
     if GlobalEnv.TRY_INSTALL_XFORMERS:
-        if GlobalEnv.REINSTALL_ALL or not is_installed("xformers"):
+        xformers_installed = is_installed("xformers")
+        if GlobalEnv.REINSTALL_ALL or not xformers_installed:
             xformers_package = os.environ.get('XFORMERS_PACKAGE', 'xformers==0.0.23')
             if platform.system() == "Windows":
                 if platform.python_version().startswith("3.10"):
@@ -63,16 +67,9 @@ def prepare_environment():
         run_pip(f"install -r \"{requirements_file}\"", "requirements")
 
     
-    """ DefaultConfigImageGen.base_model_name, FolderPathsConfig.path_checkpoints = download_models(
-        DefaultConfigImageGen.base_model_name,
-        DefaultConfigImageGen.previous_default_models,
-        FolderPathsConfig.path_checkpoints,
-        FolderPathsConfig.path_embeddings,
-        FolderPathsConfig.path_loras,
-        FolderPathsConfig.path_vae,
-        args=LAUNCH_ARGS,
-    ) """
+   
 
+    # Set environment variables for GPU device and Hugging Face mirror
     if args.gpu_device_id is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args.gpu_device_id)
         print("Set device to:", args.gpu_device_id)
@@ -94,15 +91,15 @@ def prepare_environment():
             print(f"[Cleanup] Failed to delete content of temp dir.")
 
     if len(hash_cache) == 0 and (len(MODEL_FILENAMES) > 0 or len(LORA_FILENAMES) > 0):
-        hash_cache = init_cache(MODEL_FILENAMES, FolderPathsConfig.path_checkpoints, LORA_FILENAMES, FolderPathsConfig.path_loras)
-        if len(hash_cache) > 0:
-            print(f'[Cache] Initialized with {len(hash_cache)} entries.')
+        if args.rebuild_hash_cache:
+            hash_cache = init_cache(MODEL_FILENAMES, FolderPathsConfig.path_checkpoints, LORA_FILENAMES, FolderPathsConfig.path_loras)
+            print('[Cache] Rebuilt cache.')
         else:
-            print('[Cache] Initialization failed.')
-
-    if args.rebuild_hash_cache:
-        init_cache(MODEL_FILENAMES, FolderPathsConfig.path_checkpoints, LORA_FILENAMES, FolderPathsConfig.path_loras,)
-        print('[Cache] Rebuilt cache.')
+            hash_cache = init_cache(MODEL_FILENAMES, FolderPathsConfig.path_checkpoints, LORA_FILENAMES, FolderPathsConfig.path_loras)
+            if len(hash_cache) > 0:
+                print(f'[Cache] Initialized with {len(hash_cache)} entries.')
+            else:
+                print('[Cache] Initialization failed.')
     return
 
 
