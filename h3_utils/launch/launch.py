@@ -1,22 +1,27 @@
 import os
-import ssl
 import sys
+
+ROOT_DIR = os.path.abspath(__file__).split("h3_utils")[0]
+sys.path.append(ROOT_DIR)
+
+import ssl
 import platform
 
-from h3_utils import config
 from modules.hash_cache import init_cache, load_cache_from_file
-from modules.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
+from h3_utils.launch.launch_util import is_installed, run, python, run_pip, requirements_met, delete_folder_content
 from modules.model_loader import load_file_from_url
-from h3_utils.config import HOOOCUS_VERSION, GlobalEnv, LAUNCH_ARGS, DefaultConfigImageGen
+from h3_utils.config import HOOOCUS_VERSION, GlobalEnv, LAUNCH_ARGS
 from h3_utils.flags import LORA_FILENAMES, MODEL_FILENAMES
 from h3_utils.path_configs import FolderPathsConfig
+from h3_utils.logging_util import LoggingUtil
 
-from h3_utils.model_file_config import AllModelFiles
-
+log = LoggingUtil().get_logger()
 args = LAUNCH_ARGS
 
+log.info(f"Python {sys.version}")
+log.info(f"Hooocus version: {HOOOCUS_VERSION}")
 
-print('[System ARGV] ' + str(sys.argv))
+
 vae_approx_filenames = [
     ('xlvaeapp.pth', 'https://huggingface.co/lllyasviel/misc/resolve/main/xlvaeapp.pth'),
     ('vaeapp_sd15.pth', 'https://huggingface.co/lllyasviel/misc/resolve/main/vaeapp_sd15.pt'),
