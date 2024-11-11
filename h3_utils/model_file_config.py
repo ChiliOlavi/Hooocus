@@ -1,10 +1,16 @@
 import os
-from enum import Enum
-from typing import Any, List, Optional
+import sys
 import numpy
-from pydantic import BaseModel, Field
 
-from pydantic import BaseModel
+ROOT_DIR = os.path.abspath(__file__).split("h3_utils")[0]
+sys.path.append(ROOT_DIR)
+
+
+from enum import Enum
+
+from typing import Any, List, Optional
+
+from pydantic import BaseModel, Field
 
 from modules.model_loader import load_file_from_url
 from h3_utils.path_configs import FolderPathsConfig
@@ -12,10 +18,24 @@ from h3_utils.flags import PerformanceLoRA
 
 
 class _BaseModelFile(BaseModel):
-    model_path_basename: str = None
-    nameof_model: str = None
-    model_url: str = None
-    model_path_folder: str = None
+    """A base class for model files
+
+    Attributes:
+        - model_path_basename (str) The name of the model file.
+        - model_path_folder (str) The folder path where the model will be stored.
+        - model_url (str) The URL to download the model file.
+        - nameof_model (str) The name of the model file.
+
+    Methods:
+        - download_model() -> str: Downloads the model file and returns the full path.
+    """
+    basename_of_model: str = None
+    folder_path_of_model: str = FolderPathsConfig.path_controlnet
+    name_of_model: str = None
+    url_of_model: str = None
+    
+    def full_path(self):
+        return os.path.join(self.model_path_folder, self.model_path_basename)
 
     def download_model(self):
         if not self.model_path_folder:
@@ -32,53 +52,51 @@ class _BaseModelFile(BaseModel):
         return os.path.join(self.model_path_folder, self.model_path_basename)
 
 
-class BaseControlNetModelFiles:
-    class _BaseControlNetModelFile(_BaseModelFile):
-        model_path_folder: str = FolderPathsConfig.path_controlnet
-        def full_path(self):
-            return os.path.join(self.model_path_folder, self.model_path_basename)
-    
-    ImagePromptClipVIsion = _BaseControlNetModelFile(
-        model_name = "clip_vision_vit_h",
-        model_url = "https://huggingface.co/lllyasviel/misc/resolve/main/clip_vision_vit_h.safetensors",
-        model_path_basename = "clip_vision_vit_h.safetensors",
-    )
 
-    ImagePromptAdapterPlus = _BaseControlNetModelFile(
-        model_name = "ip-adapter-plus",
-        model_url = "https://huggingface.co/lllyasviel/misc/resolve/main/ip-adapter-plus_sdxl_vit-h.bin",
-        model_path_basename = "'ip-adapter-plus_sdxl_vit-h.bin"
-    )
+class _BaseControlNetModelFile(_BaseModelFile):
+    folder_path_of_model: str = FolderPathsConfig.path_controlnet
+    def full_path(self):
+        return os.path.join(self.model_path_folder, self.model_path_basename)
 
-    ImagePromptAdapterNegative = _BaseControlNetModelFile(
-        model_name = "fooocus_ip_negative",
-        model_url = "https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_ip_negative.safetensors",
-        model_path_basename = "fooocus_ip_negative.safetensors"
-    )
+ImagePromptClipVIsion = _BaseControlNetModelFile(
+    name_of_model = "clip_vision_vit_h",
+    url_of_model = "https://huggingface.co/lllyasviel/misc/resolve/main/clip_vision_vit_h.safetensors",
+    basename_of_model = "clip_vision_vit_h.safetensors",
+)
 
-    ImagePromptAdapterFace = _BaseControlNetModelFile(
-        model_name = "ip-adapter-plus-face",
-        model_url = "https://huggingface.co/lllyasviel/misc/resolve/main/ip-adapter-plus-face_sdxl_vit-h.bin",
-        model_path_basename = "ip-adapter-plus-face_sdxl_vit-h.bin"
-    )
+ImagePromptAdapterPlus = _BaseControlNetModelFile(
+    name_of_model = "ip-adapter-plus",
+    url_of_model = "https://huggingface.co/lllyasviel/misc/resolve/main/ip-adapter-plus_sdxl_vit-h.bin",
+    basename_of_model = "'ip-adapter-plus_sdxl_vit-h.bin"
+)
 
-    PyraCanny = _BaseControlNetModelFile(
-        controlnet_name = 'canny',
-        model_name = 'canny',
-        model_url = 'https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors',
-        model_path_basename = 'control-lora-canny-rank128.safetensors',
-    )
+ImagePromptAdapterNegative = _BaseControlNetModelFile(
+    name_of_model = "fooocus_ip_negative",
+    url_of_model = "https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_ip_negative.safetensors",
+    basename_of_model = "fooocus_ip_negative.safetensors"
+)
 
-    CPDS = _BaseControlNetModelFile(
-        controlnet_name = 'cpds',
-        model_name = 'cpds',
-        model_url = 'https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors',
-        model_path_basename = 'fooocus_xl_cpds_128.safetensors',
-    )
+ImagePromptAdapterFace = _BaseControlNetModelFile(
+    name_of_model = "ip-adapter-plus-face",
+    url_of_model = "https://huggingface.co/lllyasviel/misc/resolve/main/ip-adapter-plus-face_sdxl_vit-h.bin",
+    basename_of_model = "ip-adapter-plus-face_sdxl_vit-h.bin"
+)
+
+PyraCanny = _BaseControlNetModelFile(
+    name_of_model = 'canny',
+    url_of_model = 'https://huggingface.co/lllyasviel/misc/resolve/main/control-lora-canny-rank128.safetensors',
+    basename_of_model = 'control-lora-canny-rank128.safetensors',
+)
+
+CPDS = _BaseControlNetModelFile(
+    name_of_model = 'cpds',
+    url_of_model = 'https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors',
+    basename_of_model = 'fooocus_xl_cpds_128.safetensors',
+)
 
 class InpaintModelFiles:
     class _InpaintModelFile(_BaseModelFile):
-        model_path_folder: str = FolderPathsConfig.path_inpaint
+        folder_path_of_model: str = FolderPathsConfig.path_inpaint
 
     def download_based_on_version(self, version):
         if version == "1.0":
@@ -92,31 +110,31 @@ class InpaintModelFiles:
 
 
     InpaintHead = _InpaintModelFile(
-        model_name = 'fooocus_inpaint_head.pth',
-        model_url = 'https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/fooocus_inpaint_head.pth',
-        model_path_basename = 'fooocus_inpaint_head.pth'
+        name_of_model = 'fooocus_inpaint_head.pth',
+        url_of_model = 'https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/fooocus_inpaint_head.pth',
+        basename_of_model = 'fooocus_inpaint_head.pth'
     )
 
     InpaintPatchV1 = _InpaintModelFile(
-        model_name = 'inpaint.fooocus.patch',
-        model_url = 'https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint.fooocus.patch',
-        model_path_basename = 'inpaint.fooocus.patch'
+        name_of_model = 'inpaint.fooocus.patch',
+        url_of_model = 'https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint.fooocus.patch',
+        basename_of_model = 'inpaint.fooocus.patch'
     )
 
     InpaintPatchV25 = _InpaintModelFile(
-        model_name = 'inpaint_v25.fooocus.patch',
-        model_url = 'https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v25.fooocus.patch',
-        model_path_basename = 'inpaint_v25.fooocus.patch'
+        name_of_model = 'inpaint_v25.fooocus.patch',
+        url_of_model = 'https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v25.fooocus.patch',
+        basename_of_model = 'inpaint_v25.fooocus.patch'
     )
 
     InpaintPatchV26 = _InpaintModelFile(
-        model_name = 'inpaint_v26.fooocus.patch',
-        model_url = 'https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v26.fooocus.patch',
-        model_path_basename = 'inpaint_v26.fooocus.patch'
+        name_of_model = 'inpaint_v26.fooocus.patch',
+        url_of_model = 'https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v26.fooocus.patch',
+        basename_of_model = 'inpaint_v26.fooocus.patch'
     )
 
 class _SAMFile(_BaseModelFile):
-    model_path_folder: str = FolderPathsConfig.path_sam
+    folder_path_of_model: str = FolderPathsConfig.path_sam
 
 class SAM_Files(Enum):
     """
@@ -125,21 +143,45 @@ class SAM_Files(Enum):
     """
 
     VIT_B = _SAMFile(
-        model_name = 'sam_vit_b_01ec64.pth',
-        model_url = 'https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_b_01ec64.pth',
-        model_path_basename = 'sam_vit_b_01ec64.pth'
+        name_of_model = 'sam_vit_b_01ec64.pth',
+        url_of_model = 'https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_b_01ec64.pth',
+        basename_of_model = 'sam_vit_b_01ec64.pth'
     )
 
     VIT_L = _SAMFile(
-        model_name = 'sam_vit_l_0b3195.pth',
-        model_url = 'https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_l_0b3195.pth',
-        model_path_basename = 'sam_vit_l_0b3195.pth'
+        name_of_model = 'sam_vit_l_0b3195.pth',
+        url_of_model = 'https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_l_0b3195.pth',
+        basename_of_model = 'sam_vit_l_0b3195.pth'
     )
 
     VIT_H = _SAMFile(
-        model_name = 'sam_vit_h_4b8939.pth',
-        model_url = 'https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_h_4b8939.pth',
-        model_path_basename = 'sam_vit_h_4b8939.pth'
+        name_of_model = 'sam_vit_h_4b8939.pth',
+        url_of_model = 'https://huggingface.co/mashb1t/misc/resolve/main/sam_vit_h_4b8939.pth',
+        basename_of_model = 'sam_vit_h_4b8939.pth'
+    )
+
+
+
+class VaeApproxFiles:
+    VaeAppSDXL = _BaseModelFile(
+        folder_path_of_model = FolderPathsConfig.path_vae,
+        name_of_model = 'xlvaeapp.pth',
+        url_of_model = 'https://huggingface.co/lllyasviel/misc/resolve/main/xlvaeapp.pth',
+        basename_of_model = 'xlvaeapp.pth'
+    )
+
+    VaeAppSD15 = _BaseModelFile(
+        folder_path_of_model= FolderPathsConfig.path_vae,
+        name_of_model = 'vaeapp_sd15.pth',
+        url_of_model = 'https://huggingface.co/lllyasviel/misc/resolve/main/vaeapp_sd15.pt',
+        basename_of_model = 'vaeapp_sd15.pth'
+    )
+
+    XlToV1Interposer = _BaseModelFile(
+        folder_path_of_model = FolderPathsConfig.path_vae,
+        name_of_model = 'xl-to-v1_interposer-v4.0.safetensors',
+        url_of_model = 'https://huggingface.co/mashb1t/misc/resolve/main/xl-to-v1_interposer-v4.0.safetensors',
+        basename_of_model = 'xl-to-v1_interposer-v4.0.safetensors'
     )
 
 
@@ -153,25 +195,25 @@ class BaseControlNetTask(BaseModel):
     stop: float = Field(0.5, ge=0, le=1)
     img: Optional[numpy.ndarray] = None
     weight: float = Field(1.0, ge=0, le=1)
-    models: Optional[List[BaseControlNetModelFiles._BaseControlNetModelFile]] = None
+    all_models: Optional[List[_BaseControlNetModelFile]] = None
     name: str = Field(None, description="Name of the ControlNetTask.")
-    model_paths: Optional[List[str]] = None
+    paths_of_models: Optional[List[str]] = None
 
     def get_paths(self):
         if self.models is None:
             return []
         return [model.full_path() for model in self.models]
 
-class ControlNetTasks(BaseModel):
+class ControlNetTasks:
     ImagePrompt: BaseControlNetTask = BaseControlNetTask(
         stop = 0.5,
         name = "ImagePrompt",
         weight = 0.6,
         img = None,
-        models = [
-            BaseControlNetModelFiles.ImagePromptClipVIsion, 
-            BaseControlNetModelFiles.ImagePromptAdapterPlus,
-            BaseControlNetModelFiles.ImagePromptAdapterNegative
+        all_models = [
+            ImagePromptClipVIsion, 
+            ImagePromptAdapterPlus,
+            ImagePromptAdapterNegative
         ]
     )
     
@@ -180,10 +222,10 @@ class ControlNetTasks(BaseModel):
         img = None,
         name = "FaceSwap",
         weight = 0.75,
-        models = [
-            BaseControlNetModelFiles.ImagePromptClipVIsion,
-            BaseControlNetModelFiles.ImagePromptAdapterFace,
-            BaseControlNetModelFiles.ImagePromptAdapterNegative
+        all_models = [
+            ImagePromptClipVIsion,
+            ImagePromptAdapterFace,
+            ImagePromptAdapterNegative
         ],
     )
 
@@ -192,8 +234,8 @@ class ControlNetTasks(BaseModel):
         img = None,
         name = "PyraCanny",
         weight = 1.0,
-        models = [
-            BaseControlNetModelFiles.PyraCanny
+        all_models = [
+            PyraCanny
         ]
 
         )
@@ -203,57 +245,57 @@ class ControlNetTasks(BaseModel):
         img = None,
         name = "CPDS",
         weight = 1.0,
-        models = [
-            BaseControlNetModelFiles.CPDS
+        all_models = [
+            CPDS
         ]
     )
 
 UpscaleModel = _BaseModelFile(
-    model_url="https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin",
-    model_name="fooocus_upscaler",
-    model_path_basename="fooocus_upscaler_s409985e5.bin",
-    model_path_folder=FolderPathsConfig.path_upscale_models
+    url_of_model="https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin",
+    name_of_model="fooocus_upscaler",
+    basename_of_model="fooocus_upscaler_s409985e5.bin",
+    folder_path_of_model=FolderPathsConfig.path_upscale_models
 )
 
 SafetyCheckModel = _BaseModelFile(
-    model_url="https://huggingface.co/mashb1t/misc/resolve/main/stable-diffusion-safety-checker.bin",
-    model_name="fooocus_safety_check",
-    model_path_basename="stable-diffusion-safety-checker.bin",
-    model_path_folder=FolderPathsConfig.path_safety_checker
+    url_of_model="https://huggingface.co/mashb1t/misc/resolve/main/stable-diffusion-safety-checker.bin",
+    name_of_model="fooocus_safety_check",
+    basename_of_model="stable-diffusion-safety-checker.bin",
+    folder_path_of_model=FolderPathsConfig.path_safety_checker
 )
 
 SDXL_LightningLoRA = _BaseModelFile(
-    model_url="https://huggingface.co/mashb1t/misc/resolve/main/sdxl_lightning_4step_lora.safetensors",
-    model_name=PerformanceLoRA.LIGHTNING.value,
-    model_path_basename=PerformanceLoRA.LIGHTNING.value,
-    model_path_folder=FolderPathsConfig.path_loras
+    url_of_model="https://huggingface.co/mashb1t/misc/resolve/main/sdxl_lightning_4step_lora.safetensors",
+    name_of_model=PerformanceLoRA.LIGHTNING.value,
+    basename_of_model=PerformanceLoRA.LIGHTNING.value,
+    folder_path_of_model=FolderPathsConfig.path_loras
 )
 
 SDXL_HyperSDLoRA = _BaseModelFile(
-    model_url="https://huggingface.co/mashb1t/misc/resolve/main/sdxl_hyper_sd_4step_lora.safetensors",
-    model_name=PerformanceLoRA.HYPER_SD.value,
-    model_path_basename=PerformanceLoRA.HYPER_SD.value,
-    model_path_folder=FolderPathsConfig.path_loras
+    url_of_model="https://huggingface.co/mashb1t/misc/resolve/main/sdxl_hyper_sd_4step_lora.safetensors",
+    name_of_model=PerformanceLoRA.HYPER_SD.value,
+    basename_of_model=PerformanceLoRA.HYPER_SD.value,
+    folder_path_of_model=FolderPathsConfig.path_loras
 )
 
 SDXL_LCM_LoRA = _BaseModelFile(
-    model_url="https://huggingface.co/lllyasviel/misc/resolve/main/sdxl_lcm_lora.safetensors",
-    model_name=PerformanceLoRA.EXTREME_SPEED.value,
-    model_path_basename=PerformanceLoRA.EXTREME_SPEED.value,
-    model_path_folder=FolderPathsConfig.path_loras
+    url_of_model="https://huggingface.co/lllyasviel/misc/resolve/main/sdxl_lcm_lora.safetensors",
+    name_of_model=PerformanceLoRA.EXTREME_SPEED.value,
+    basename_of_model=PerformanceLoRA.EXTREME_SPEED.value,
+    folder_path_of_model=FolderPathsConfig.path_loras
 )
 
 
-class AllModelFiles(Enum):
+class AllModelFiles:
 
-    BaseModel: _BaseModelFile = _BaseModelFile()
-    UpscaleModel: _BaseModelFile = UpscaleModel
-    SafetyCheckModel: _BaseModelFile = SafetyCheckModel
-    SDXL_LightningLoRA: _BaseModelFile = SDXL_LightningLoRA
-    SDXL_HyperSDLoRA: _BaseModelFile = SDXL_HyperSDLoRA
-    SDXL_LCM_LoRA: _BaseModelFile = SDXL_LCM_LoRA
-    ControlNetModels: BaseControlNetModelFiles = BaseControlNetModelFiles()
-    InpaintModels: InpaintModelFiles = InpaintModelFiles()
-    SAM_Files: _SAMFile = SAM_Files
+    BaseModel = _BaseModelFile()
+    UpscaleModel = UpscaleModel
+    SafetyCheckModel = SafetyCheckModel
+    SDXL_LightningLoRA = SDXL_LightningLoRA
+    SDXL_HyperSDLoRA = SDXL_HyperSDLoRA
+    SDXL_LCM_LoRA = SDXL_LCM_LoRA
+    ControlNetModels = [ControlNetTasks.ImagePrompt.all_models, ControlNetTasks.FaceSwap.all_models, ControlNetTasks.PyraCanny.all_models, ControlNetTasks.CPDS.all_models]
+    InpaintModels = InpaintModelFiles()
+    SAM_Files = SAM_Files
     
 
