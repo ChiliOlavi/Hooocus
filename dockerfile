@@ -14,7 +14,7 @@ RUN /var/requirements/install_system_requirements.sh && \
 ENV SVDIR=/var/runit
 ENV WORKER_TIMEOUT=400
 
-COPY /Hooocus .
+COPY /. .
 
 EXPOSE 5001 8883 8888
 
@@ -22,4 +22,4 @@ EXPOSE 5001 8883 8888
 RUN apt-get update
 RUN apt-get install -y openssh-server openssh-client
 
-CMD ["python score.py"]
+#CMD ["python score.py"]

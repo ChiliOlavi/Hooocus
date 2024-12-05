@@ -3,9 +3,9 @@ import io
 import json
 from base64 import b64encode
 from azureml.contrib.services.aml_response import AMLResponse
-from main import generate_image()
 from h3_utils.launch import prepare_environment
 from h3_utils.config import ImageGenerationObject
+from .modules.async_worker import ImageTaskProcessor
 
 #Thanks to Azure/gen-cv for the implementation: https://github.com/Azure/gen-cv/tree/main?tab=MIT-1-ov-file#readme
 def init():
@@ -31,8 +31,11 @@ def encode_response(images):
 def run(raw_data):
    data = json.loads(raw_data)["data"]
    img_obj = ImageGenerationObject.model_validate(data)
-   new_imgs = generate_image(img_obj) #Does not really return the image at this point.
-   encoded_response = encode_response(new_imgs)
+   img_generator = ImageTaskProcessor.process_single_task(img_obj)
+   if len(img_generator.yields)>0:
+      flag, product = img_generator.yields.pop(0)
+      if flag=="finish":
+        encoded_response = encode_response(product)
    resp = AMLResponse(message=encoded_response, status_code=200, json_str=True)
    return resp
 
